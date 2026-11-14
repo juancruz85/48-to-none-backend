@@ -6,16 +6,37 @@ DUTIES:
 === Manage Backend ===
 
 + Backend management looks like intelligent allocation of resources
-- Backend maintainance
-+ Constant refreshes, regular upkeep.
-- Backend 
 
++ Organize data
+
+- Backend maintainance
++ Edge cases (if something diff)
++ Constant refreshes, regular upkeep.
+
+- Backend Failsafes
++ Failsafe 1: Pwr cycle our backend
++ Failsafe 2: Cry to Dev Team
 
 
 
 """
 
+"""
+*****************************************************************************
+"""
+
+"""
+*** LIBRARIES ***
+"""
+
+
+"""
+[[[ GLOBAL VARIABLES ]]]
+"""
 
 
 
+"""
+=== FUNCTIONS ===
+"""
 
