@@ -50,14 +50,30 @@ import pandas as pd
 
 def Data(data):
     #Organize
+
+
+
+
     pass
 
 def A2(data):
     #send to model then return
+
+
+
+
+
     pass
 
 def A3(results):
     #send data
+
+
+
+
+
+
+    
     pass
 
     
