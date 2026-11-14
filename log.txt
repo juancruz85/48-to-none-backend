@@ -171,3 +171,8 @@ Good luck next shift.
 - Another fix we suggest for the model only reading singular purchases is to slice a singular csv into parts that an AI can speed read.
 
 - Goals: Feed data to model, extensively test and vet programs, add new features only if required.
+
+>>> Codex tests []
+- Manager Daemon Failsafes and error handling tested 
+- Simulated profile tests (created a compact purchase history profile and tested the model with it)
+- Tested the
