@@ -53,6 +53,8 @@ this fuction will be recalled when failsafe 1 kicks in.
 
 """ LIBS """
 
+import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -127,11 +129,32 @@ def run(data_dir=DATA_DIR):
     return None
 
 
-if __name__ == "__main__":
-    results = run()
-    ms.print_state()
-    if results is None:
-        print(f"run failed, last error: {ms.last_error!r}")
+def serve(data_dir=DATA_DIR, interval=30, cycles=None):
+    """
+    run(), then stay up: every `interval` seconds refresh from the csv folder and check what is new or changed.
+
+    Runs until stopped (ctrl-c), or for `cycles` refreshes if given. Returns the dashboard, or None if run() could not be fixed.
+    """
+    results = run(data_dir)
+    show(results)
+    done = 0
+    try:
+        while results is not None and (cycles is None or done < cycles):
+            time.sleep(interval)
+            done += 1
+            try:
+                show(MD.D_refresh())
+            except Exception as error:
+                MD.report_error(error)
+                results = run(data_dir)
+                show(results)
+    except KeyboardInterrupt:
+        pass
+    MD.shutdown()
+    return None if results is None else dict(MD.dashboard)
+
+
+def show(results):
     for sheet_id, entry in (results or {}).items():
         if entry["error"]:
             print(f"\n{sheet_id}: FAILED, the other sheets were not affected: {entry['error']}")
@@ -142,3 +165,15 @@ if __name__ == "__main__":
         print(f"\n{sheet_id}: {len(entry['fraud'])} possible fraud out of {len(entry['irregular'])} irregular purchases")
         for purchase in entry["fraud"]:
             print(f"  row {purchase['row']} | {purchase['date']} | {purchase['item']} | ${purchase['amount']:.2f} | {purchase['reason']}")
+
+
+if __name__ == "__main__":
+    # "python -m src.main" checks everything once. "python -m src.main serve [seconds]" stays up and refreshes.
+    if sys.argv[1:2] == ["serve"]:
+        results = serve(interval=float(sys.argv[2]) if len(sys.argv) > 2 else 30)
+    else:
+        results = run()
+        show(results)
+    ms.print_state()
+    if results is None:
+        print(f"run failed, last error: {ms.last_error!r}")

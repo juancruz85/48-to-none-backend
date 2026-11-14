@@ -131,6 +131,21 @@ class TestFlow(unittest.TestCase):
         self.assertEqual([(p["item"], p["reason"]) for p in fraud], [("Mystery Box", "far above the usual amount")])
         self.assertEqual(sheet.data.loc[fraud[0]["row"], "Item"], "Mystery Box")
 
+    def test_every_ai_reply_is_stored(self):
+        (self.data_dir / "store.csv").write_text(STORE + "2026-10-20,Mystery Box,99.99\n2026-10-25,Song,1.29\n")
+        sheet = MD.D_analyze(MD.D_organize(MD.D_load(self.data_dir)["store.csv"]))
+        replies = iter(["FRAUD - far above the usual amount", "hmm, hard to say"])
+        MD.start_logging()
+
+        with mock.patch("src.model.load", return_value=lambda messages, **kwargs: [{"generated_text": next(replies)}]):
+            model.respond(sheet)
+
+        stored = (MD.LOG_DIR / "ai_replies.txt").read_text()
+        self.assertEqual(stored.count("| store.csv | row "), 2)
+        self.assertIn("ASKED: 2026-10-20, Mystery Box, $99.99.", stored)
+        self.assertIn("AI REPLIED: FRAUD - far above the usual amount\nCOUNTED AS: FRAUD\n", stored)
+        self.assertIn("AI REPLIED: hmm, hard to say\nCOUNTED AS: UNCLEAR (not counted as fraud)\n", stored)
+
     def test_respond_skips_the_model_when_nothing_is_irregular(self):
         sheet = MD.D_analyze(MD.D_load(self.data_dir)["store.csv"])
         pipe = mock.Mock()

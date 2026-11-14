@@ -71,6 +71,7 @@ Autonomous for application.
 
 import logging
 import traceback
+from concurrent.futures import CancelledError, ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -96,6 +97,12 @@ sheets = {}
 # data leaves
 dashboard = {}
 
+# where the csvs were loaded from and each csv's modified time when it was read, for refresh
+source_dir = None
+mtimes = {}
+
+_workers = {}
+
 """
 === FUNCTIONS ===
 
@@ -107,10 +114,13 @@ D = data
 
 
 def D_load(data_dir):
-    global sheets
+    global sheets, source_dir
     paths = sorted(Path(data_dir).glob("*.csv"))
     if not paths:
         raise FileNotFoundError(f"No csv input found in {data_dir}")
+    stop_requests()
+    source_dir = Path(data_dir)
+    mtimes.clear()
     sheets = {path.name: D_createsheet(path) for path in paths}
     log.info("loaded %d sheet(s) from %s: %s", len(sheets), data_dir, sorted(sheets))
     return sheets
@@ -126,6 +136,7 @@ def D_createsheet(csv, person_name="", banks=None):
     #you'll need to have the watchdog create the datasheet objects from the csvs.
     csv = Path(csv)
     data = pd.read_csv(csv)
+    mtimes[csv.name] = csv.stat().st_mtime_ns
     places = sorted(set(data["Description"].dropna())) if "Description" in data.columns else []
     return ds.Sheet(
         sheet_id=csv.name,
@@ -186,31 +197,116 @@ def D_process(sheet, model=None):
     return D_result(D_send(sheet, model))
 
 
-def D_run(model=None):
-    results, errors = {}, []
-    for sheet_id, sheet in sheets.items():
-        #checked before every sheet so work stops as soon as an error is reported.
-        if ms.state is not ms.State.OPERATIONAL:
-            raise RuntimeError(f"manager is {ms.state.value}, not operational")
-        log.info("checking %s", sheet_id)
-        sheet.results.clear()
+def D_check(sheet, model=None):
+    #checked before every sheet so work stops as soon as an error is reported.
+    if ms.state is not ms.State.OPERATIONAL:
+        raise RuntimeError(f"manager is {ms.state.value}, not operational")
+    log.info("checking %s", sheet.sheet_id)
+    sheet.results.clear()
+    try:
+        entry = D_process(sheet, model)
+    except Exception as error:
+        log.error("%s failed, the other sheets carry on: %r", sheet.sheet_id, error, exc_info=error)
+        sheet.results["error"] = repr(error)
+        return D_result({"sheet_id": sheet.sheet_id, "response": None}), error
+    if entry["vet"]:
+        log.warning("%s not checked, failed vetting: %s", sheet.sheet_id, entry["vet"])
+    else:
+        log.info("%s done: %d irregular, %d possible fraud", sheet.sheet_id, len(entry["irregular"]), len(entry["fraud"]))
+    return entry, None
+
+
+def D_run(model=None, only=None):
+    names = list(sheets) if only is None else list(only)
+    futures = {name: request(name, D_check, model) for name in names}
+    results, errors, stopped = {}, [], None
+    #every future is waited for before anything is raised, so no sheet is still being worked on when supervision takes over.
+    for name, future in futures.items():
         try:
-            entry = D_process(sheet, model)
-        except Exception as error:
-            log.error("%s failed, the other sheets carry on: %r", sheet_id, error, exc_info=error)
-            errors.append(error)
-            sheet.results["error"] = repr(error)
-            entry = D_result({"sheet_id": sheet_id, "response": None})
+            results[name], error = future.result()
+        except CancelledError:
+            stopped = stopped or RuntimeError(f"manager is {ms.state.value}, work on {name} was stopped")
+        except RuntimeError as not_operational:
+            stopped = stopped or not_operational
         else:
-            if entry["vet"]:
-                log.warning("%s not checked, failed vetting: %s", sheet_id, entry["vet"])
-            else:
-                log.info("%s done: %d irregular, %d possible fraud", sheet_id, len(entry["irregular"]), len(entry["fraud"]))
-        results[sheet_id] = entry
+            if error is not None:
+                errors.append(error)
+    #an error reported while the sheets were being checked: both may have finished, but supervision has to take over.
+    if stopped is None and ms.state is not ms.State.OPERATIONAL:
+        stopped = RuntimeError(f"manager is {ms.state.value}, not operational")
+    if stopped is not None:
+        raise stopped
     #if every sheet breaks the problem is not the sheets, so the error goes up to supervision.
     if errors and len(errors) == len(sheets):
         raise errors[-1]
     return results
+
+
+#_________________________________________________________________
+# REQUESTS
+# every sheet has its own single worker, so actions on the same sheet run one at a time in the order they were
+# asked for, while different sheets run at the same time. anything that reads or edits a sheet should go through request.
+
+
+def _submit(sheet_id, work):
+    worker = _workers.get(sheet_id) or _workers.setdefault(
+        sheet_id, ThreadPoolExecutor(max_workers=1, thread_name_prefix=sheet_id)
+    )
+    return worker.submit(work)
+
+
+def request(sheet_id, action, *args, **kwargs):
+    """Queue action(sheet, *args, **kwargs) on a sheet. Returns a Future, call .result() on it to wait for the answer."""
+    if ms.state is not ms.State.OPERATIONAL:
+        raise RuntimeError(f"manager is {ms.state.value}, not operational")
+    if sheet_id not in sheets:
+        raise KeyError(sheet_id)
+    log.info("request: %s on %s", getattr(action, "__name__", action), sheet_id)
+    #the sheet is looked up when the action runs, not now, because a refresh may have replaced it in between.
+    return _submit(sheet_id, lambda: action(sheets[sheet_id], *args, **kwargs))
+
+
+def stop_requests():
+    #wait=False because a worker can be the one reporting the error, and it cannot wait for itself.
+    #queued work is dropped, work that is already running finishes.
+    for worker in list(_workers.values()):
+        worker.shutdown(wait=False, cancel_futures=True)
+    _workers.clear()
+
+
+def D_refresh(model=None):
+    #brings the sheets in line with the csv folder: new csv -> new sheet, changed csv -> sheet rebuilt, deleted csv -> sheet dropped.
+    #only new and changed sheets are checked again.
+    if ms.state is not ms.State.OPERATIONAL:
+        raise RuntimeError(f"manager is {ms.state.value}, not operational")
+    paths = {path.name: path for path in Path(source_dir).glob("*.csv")}
+
+    for name in [name for name in sheets if name not in paths]:
+        worker = _workers.pop(name, None)
+        if worker is not None:
+            worker.shutdown(wait=True)
+        sheets.pop(name)
+        dashboard.pop(name, None)
+        mtimes.pop(name, None)
+        log.info("refresh: %s was deleted, sheet dropped", name)
+
+    changed = []
+    for name, path in sorted(paths.items()):
+        mtime = path.stat().st_mtime_ns
+        if mtimes.get(name) == mtime:
+            continue
+        try:
+            sheet = D_createsheet(path)
+        except Exception as error:
+            #remembered as seen so a file that cannot be read is not retried (and logged) on every refresh, only when it changes.
+            mtimes[name] = mtime
+            log.error("refresh: could not read %s, skipped until it changes: %r", name, error, exc_info=error)
+            continue
+        #swapped in by the sheet's own worker so it lands after any actions still queued on the old sheet.
+        _submit(name, lambda name=name, sheet=sheet: sheets.__setitem__(name, sheet)).result()
+        log.info("refresh: %s is new or changed, sheet rebuilt", name)
+        changed.append(name)
+    return D_run(model, only=changed) if changed else {}
 
 
 #_________________________________________________________________
@@ -221,13 +317,18 @@ def D_run(model=None):
 
 def start_logging():
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    for handler in list(log.handlers):
-        log.removeHandler(handler)
-        handler.close()
-    handler = logging.FileHandler(LOG_DIR / "manager.log")
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    log.addHandler(handler)
-    log.setLevel(logging.INFO)
+    files = [
+        (log, "manager.log", "%(asctime)s %(levelname)s %(message)s"),
+        (mo.replies, "ai_replies.txt", "%(message)s"),
+    ]
+    for logger, name, layout in files:
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+            handler.close()
+        handler = logging.FileHandler(LOG_DIR / name)
+        handler.setFormatter(logging.Formatter(layout))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
 
 
 def recover():
@@ -281,6 +382,7 @@ def report_error(error):
     log.error("error reported: %r", error, exc_info=error if isinstance(error, BaseException) else None)
     ms.enter_error(error)
     ms.hardstop()
+    stop_requests()
     return ms.state
 
 
@@ -297,4 +399,5 @@ def recovery_failed(error=None):
 
 
 def shutdown():
+    stop_requests()
     return ms.shutdown()

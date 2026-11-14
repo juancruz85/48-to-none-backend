@@ -11,7 +11,10 @@ load() runs once at startup (see start_services in managerdaemon). first run dow
 The manager calls respond() once per sheet (see D_send in managerdaemon).
 """
 
+import logging
 import re
+import threading
+from datetime import datetime
 
 MODEL_ID = "microsoft/Phi-4-mini-instruct"
 
@@ -29,6 +32,14 @@ SYSTEM = (
 VERDICT = re.compile(r"\b(FRAUD|OK)\b\W*(.*)", re.IGNORECASE)
 
 _pipe = None
+
+# every question to the model and its reply, written to logs/ai_replies.txt (see start_logging in managerdaemon)
+replies = logging.getLogger("ai")
+replies.addHandler(logging.NullHandler())
+replies.propagate = False
+
+# sheets are checked at the same time but there is one model, and it is not safe to run it from two threads at once.
+_lock = threading.Lock()
 
 
 def load():
@@ -55,8 +66,15 @@ def respond(sheet):
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": question},
         ]
-        output = load()(messages, max_new_tokens=40, return_full_text=False, do_sample=False)
-        verdict = VERDICT.search(output[0]["generated_text"])
+        with _lock:
+            output = load()(messages, max_new_tokens=40, return_full_text=False, do_sample=False)
+        reply = output[0]["generated_text"].strip()
+        verdict = VERDICT.search(reply)
+        replies.info(
+            "===== %s | %s | row %s =====\nASKED: %s\nAI REPLIED: %s\nCOUNTED AS: %s\n",
+            datetime.now().isoformat(sep=" ", timespec="seconds"), sheet.sheet_id, p["row"], question, reply,
+            verdict.group(1).upper() if verdict else "UNCLEAR (not counted as fraud)",
+        )
         if verdict and verdict.group(1).upper() == "FRAUD":
             fraud.append({**p, "reason": verdict.group(2).strip()})
     return fraud

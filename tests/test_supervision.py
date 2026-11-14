@@ -1,9 +1,11 @@
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
 
 from src import main, managerdaemon as MD, msm
+from src.mattsheet import Sheet
 
 BANK = (
     "Description,Date,Amount,Transaction_Type\n"
@@ -106,7 +108,13 @@ class TestSupervision(unittest.TestCase):
 
     def test_sheet_that_failed_is_tried_again_on_the_next_run(self):
         main.initialize(self.data_dir)
-        self.respond.side_effect = [RuntimeError("hiccup on a"), []]
+
+        def hiccup_on_a(sheet):
+            if sheet.sheet_id == "a.csv":
+                raise RuntimeError("hiccup on a")
+            return []
+
+        self.respond.side_effect = hiccup_on_a
         self.assertEqual(MD.D_run()["a.csv"]["error"], "RuntimeError('hiccup on a')")
 
         self.respond.side_effect = None
@@ -117,15 +125,23 @@ class TestSupervision(unittest.TestCase):
 
     def test_work_stops_once_an_error_is_reported(self):
         main.initialize(self.data_dir)
+        queued = threading.Event()
 
-        def model_that_sees_a_problem(sheet):
+        def sees_a_problem(sheet):
+            queued.wait(5)
             MD.report_error("something broke elsewhere")
-            return []
 
+        first = MD.request("a.csv", sees_a_problem)
+        second = MD.request("a.csv", Sheet.reset)
+        queued.set()
+        first.result(5)
+
+        self.assertTrue(second.cancelled())  # it was queued behind the error, so it never ran
+        self.assertEqual(MD.sheets["a.csv"].transaction_history, [])
         with self.assertRaises(RuntimeError):
-            MD.D_run(model_that_sees_a_problem)
-
-        self.assertEqual(sorted(MD.dashboard), ["a.csv"])  # b.csv was never started
+            MD.request("b.csv", Sheet.reset)
+        with self.assertRaises(RuntimeError):
+            MD.D_run()
 
     def test_recover_fails_when_the_model_will_not_load(self):
         main.initialize(self.data_dir)
