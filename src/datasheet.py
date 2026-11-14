@@ -110,6 +110,15 @@ def payment_frequency(paid):
         "median_days_between_any_charges": paid["Date"].diff().dt.days.median(),
     }
 
+
+"""
+MUST ROUTE ALL PRINT STATEMENTS AS RETURN VALUES THEN GIVE THAT TO THE AI MODEL.
+
+THEN FINAL WILL ROUTE TO DASHBOARD.
+"""
+
+
+
 def main(paths):
     df = load(paths)
     paid = df[df["Amount"] > 0]
