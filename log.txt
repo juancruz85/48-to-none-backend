@@ -38,3 +38,48 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 Juan Commit #35:
 I went through and did Steps 2-3 as well as added two new tests specifically for the new features. Next will be step 4. 
 Ivan has also started work on frontend as well at this current time.
+
+Juan Commit #36:
+Literally just updated log lol
+
+Juan Commit #37:
+Added the Phi-4-mini as the model we will run for this project. Completed checklist up to step 4. 
+Now you need to use the prerequisites listed below before running this again. 
+
+Prerequisites to run the project (the model is now part of startup):
+1. Python 3.14 (what the project is built and tested on).
+2. From the repo root, make the virtual environment and install the libraries:
+   python3 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+   (installs numpy, pandas, paramiko, torch, transformers, accelerate)
+3. At least 15 GB of free disk space. The model is Phi-4-mini-instruct from Hugging Face (microsoft/Phi-4-mini-instruct).
+   It is NOT in the repo. It downloads itself (7.7 GB) the first time startup runs, so the first run needs internet and takes a while.
+   No Hugging Face account or token is needed.
+4. 16 GB of RAM recommended, the model takes about 8 GB while running.
+5. Always run with .venv/bin/python, not plain python3, or the libraries will not be found.
+   Run the tests (they use a stand-in for the model, so no download needed):
+   .venv/bin/python -m unittest tests.test_msm tests.test_startup tests.test_sheet tests.test_flow
+   Run the full system (details below):
+   .venv/bin/python -m src.main
+
+How to run the full system as it stands right now (fraud detection is the model's only job):
+1. Put the csv files to check in purchase_data/. Each csv becomes one sheet, the file name is its id.
+   Two layouts work: bank (Description, Date, Amount, Transaction_Type) and store (Date, Item, Amount (USD)).
+2. From the repo root run:
+   .venv/bin/python -m src.main
+3. What happens, in order:
+   - startup: manager goes stopped -> starting, loads every csv into a sheet, loads the model, then goes operational.
+   - each sheet is sorted by date and vetted. a sheet with bad data (missing values, unreadable dates or amounts) is NOT checked, it prints "not checked, fix the data first".
+   - the code shortlists the irregular purchases (one-off item at that price, amount 3x the usual, same charge twice in a day, 3+ charges in a day).
+   - the model is asked about each shortlisted purchase one at a time and answers FRAUD or OK with a reason.
+   - each flag is routed back to its own sheet and row.
+4. What you see: the manager state ("operational"), then per csv the number of possible fraud and one line per flagged purchase (row, date, item, amount, reason).
+   On my Mac the whole run takes about 80 seconds for the two csvs in purchase_data/. If startup fails it prints "startup failed: ..." and the state is "error".
+5. To use it from code instead of the terminal (this is what the frontend will read):
+   from src import main
+   results = main.run()          # {sheet id: dashboard entry}, or None if startup failed
+   results["data.csv"]["fraud"]  # the flagged purchases for that sheet
+   Each dashboard entry has: sheet_id, person_name, banks, places, vet, analysis, irregular, fraud.
+   The same entries are kept in managerdaemon.dashboard.
+6. Not done yet: no frontend or API is connected, nothing is hosted on AWS, and steps 5-6 of the action plan (supervision, concurrent requests) are not started.
+   The model's FRAUD/OK calls have not been checked against known fraud, treat them as "possible fraud".

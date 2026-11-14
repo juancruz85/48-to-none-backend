@@ -75,6 +75,8 @@ import numpy as np
 import pandas as pd
 from . import msm as ms
 from . import mattsheet as ds
+from . import datasheet as da
+from . import model as mo
 
 """
 [[[ GLOBAL VARIABLES ]]]
@@ -82,6 +84,9 @@ from . import mattsheet as ds
 
 # data enters
 sheets = {}
+
+# data leaves: {sheet_id: what the dashboard shows for that sheet}
+dashboard = {}
 
 """
 === FUNCTIONS ===
@@ -104,7 +109,8 @@ def D_load(data_dir):
 
 def start_services():
     #start backend, api, frontend
-    print("start_services called")
+    #only the model exists so far. loading it here means every sheet reuses the same loaded model.
+    mo.load()
 
 
 def D_createsheet(csv, person_name="", banks=None):
@@ -132,28 +138,57 @@ def D_organize(sheet):
     sheet.results["vet"] = sheet.vet()
     return sheet
 
-def D_send(data = "blank" ): #default arg is a ruler
+def D_analyze(sheet):
+    #runs the datasheet analysis and keeps the report and the irregular purchases on the sheet.
+    prepared = da.prepare(sheet.data)
+    sheet.results["analysis"] = da.report(prepared)
+    sheet.results["irregular"] = da.irregular(prepared)
+    return sheet
+
+
+def D_send(sheet, model=None):
     #send to model then return
-    #(data is a csv file.)
-    #(use paramiko library to send file to a server.)
+    #the model lives in this backend (model.py). pass another function to swap it out, e.g. in tests.
+    #the response comes back tagged with the sheet's id so it can be routed to its batch.
+    response = (model or mo.respond)(sheet)
+    return {"sheet_id": sheet.sheet_id, "response": response}
 
 
-
-
-    pass
-
-def D_result(results):
+def D_result(result):
     #send data
+    #routes a model result back to the sheet it came from, then builds what the dashboard gets.
+    #no frontend yet, so the dashboard payload is returned and kept in ``dashboard``.
+    sheet = sheets[result["sheet_id"]]
+    sheet.results["fraud"] = result["response"]
+    dashboard[sheet.sheet_id] = {
+        "sheet_id": sheet.sheet_id,
+        "person_name": sheet.person_name,
+        "banks": sheet.banks,
+        "places": sheet.places,
+        "vet": sheet.results.get("vet", []),
+        "analysis": sheet.results.get("analysis"),
+        "irregular": sheet.results.get("irregular", []),
+        "fraud": sheet.results["fraud"],
+    }
+    return dashboard[sheet.sheet_id]
 
 
+def D_process(sheet, model=None):
+    #one sheet all the way through: organize, analyze, send to model, route the result back.
+    #a sheet that fails vetting is not sent to the model.
+    D_organize(sheet)
+    if sheet.results["vet"]:
+        return D_result({"sheet_id": sheet.sheet_id, "response": None})
+    D_analyze(sheet)
+    return D_result(D_send(sheet, model))
 
 
+def D_run(model=None):
+    #process every loaded sheet. only works while the manager is operational.
+    if ms.state is not ms.State.OPERATIONAL:
+        raise RuntimeError(f"manager is {ms.state.value}, not operational")
+    return {sheet_id: D_process(sheet, model) for sheet_id, sheet in sheets.items()}
 
-
-    
-    pass
-
-    
 
 
 def start():

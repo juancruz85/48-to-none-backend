@@ -96,6 +96,24 @@ def initialize(data_dir=DATA_DIR):
     return sheets
 
 
+def run(data_dir=DATA_DIR):
+    """
+    The whole program: start up, then check every sheet for fraud.
+
+    Returns {sheet_id: dashboard entry}, or None if startup failed.
+    """
+    if initialize(data_dir) is None:
+        return None
+    return MD.D_run()
+
+
 if __name__ == "__main__":
-    initialize()
+    results = run()
     ms.print_state()
+    for sheet_id, entry in (results or {}).items():
+        if entry["vet"]:
+            print(f"\n{sheet_id}: not checked, fix the data first: {entry['vet']}")
+            continue
+        print(f"\n{sheet_id}: {len(entry['fraud'])} possible fraud out of {len(entry['irregular'])} irregular purchases")
+        for purchase in entry["fraud"]:
+            print(f"  row {purchase['row']} | {purchase['date']} | {purchase['item']} | ${purchase['amount']:.2f} | {purchase['reason']}")
