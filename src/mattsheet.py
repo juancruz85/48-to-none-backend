@@ -9,6 +9,7 @@ _____________________________________________________
 """
 DATASHEET CODE
 """
+#####################################################################
 """
 ABS:
 Datasheet is a class
@@ -36,6 +37,14 @@ using this meta data and history we can reorganize it and vet it (vet meaning an
 
 
 """
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx
+
+
+
+
+
+
+
 
 """
 LIBS
@@ -47,16 +56,36 @@ from dataclasses import dataclass
 #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 
+"""
+Glob Var
+"""
+
+"""
+Functions
+"""
 
 
+##############################################################
+"""
+CLASSES
+"""
+#dataclass notes:
+"""
+Data class is just a class that omits some boilerplate code
+
+__repr__ allows you to see the set data for a given object.
+
+
+"""
 @dataclass 
 class Sheet:
     #class for a respective datasheet.
     #has transaction history, has date, has specific data (please fill in later)
 
     #add method to reset datasheet
-    #add variable to mark data sheet corrct 
 
-    is_sorted bool = False
+    #Variable to toggle once a data sheet is 
+    is_sorted: bool = False
 
     pass
+######################################################################################3

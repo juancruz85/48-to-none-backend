@@ -55,7 +55,7 @@ toggleallow = False
 # if not error variable == true then assume operational. Operational handles actions
 
 
-def toggle():
+def togglestate():
 #global vars
     global toggleallow
     global operationalstate
@@ -88,7 +88,7 @@ def toggle():
 
 
 #_____________________________________________________________________
-toggle()
+togglestate()
 
 
 

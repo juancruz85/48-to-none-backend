@@ -10,7 +10,7 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 
 >>> Added Mattsheet.py, note to all. I am laying framework then leaving legit coding and syntax logic for later so if I comment something and there is no code then the comment dictates exactly what to code.
 
-
+>>> Mass framework development. Updated some naming conventions.
 
 
 

@@ -6,6 +6,7 @@ TZWATZWATZWA!!!
 _____________________________________________________
 
 DAEMON PROTOCOL FOR BACKEND
+'Man the Manager'
 
 __________________________________________________
 DUTIES:
@@ -30,9 +31,39 @@ DUTIES:
 
 """
 
+
+#*****************************************************************************
+
 """
-*****************************************************************************
+notes:
+
+
+basically, the way this manager daemon works is that the manager is an active program that runs constantly.
+During this constant runtime, it will either be in two states.
+
+Operational or Error
+for operational:
+    the manager daemon will do it's normal actions and routines, handling concurrent requests and data management.
+    Actions can be queued concurrently per datasheet but never the same time for their respective datasheet
+
+
+For Error: 
+    The manager will first save a log of everything, disabling the frontend and backend connection, 
+    then start documenting the error.
+    It will attempt to resolve the issue on it's own, after that it will go into failsafe mode 1.
+    In case of failsafe mode 1 not saving us, failsafe 2 will go into effect calling for out help
+
+Actions themselves are simply functions like "managercall()" which do subactions that pertain to the file they are manipulating.
+these subactions are made in the files where they happen, so think of it like subsystems and this is like some sort of main file
+with a brain.
+
+TLDR:
+Autonomous for application.
+
 """
+
+#*****************************************************************************
+
 
 """
 *** LIBRARIES ***
@@ -51,7 +82,8 @@ import pandas as pd
 """
 === FUNCTIONS ===
 
-suffix D_function
+prefix for msm
+D_function
 D = data
 
 """
