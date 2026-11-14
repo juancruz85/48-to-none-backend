@@ -27,8 +27,8 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 >>> Action plan
 1. Define the basic lifecycle: startup, normal operation, error handling, and shutdown. Make the state machine reliably enter and leave each state. - done by Juan Commit #35
 2. Build the startup path: initialize the manager, load the input data, and start backend services. - done by Juan Commit #35
-3. Implement data handling: create one sheet per input, attach metadata, and preserve each sheet’s identity through analysis and response.
-4. Connect the AI and dashboard flow: send data to the model, collect results, and route them back with their original batch.
+3. Implement data handling: create one sheet per input, attach metadata, and preserve each sheet’s identity through analysis and response. - done by Juan Commit #37
+4. Connect the AI and dashboard flow: send data to the model, collect results, and route them back with their original batch. - done by Juan Commit #37
 5. Add supervision: log activity, check for errors, stop work during failures, attempt recovery, then restart or report the issue to the development team.
 6. Add request handling and refresh routines: support concurrent work across sheets while preventing simultaneous edits to the same sheet.
 
@@ -83,3 +83,5 @@ How to run the full system as it stands right now (fraud detection is the model'
    The same entries are kept in managerdaemon.dashboard.
 6. Not done yet: no frontend or API is connected, nothing is hosted on AWS, and steps 5-6 of the action plan (supervision, concurrent requests) are not started.
    The model's FRAUD/OK calls have not been checked against known fraud, treat them as "possible fraud".
+
+Juan Commit #38:
