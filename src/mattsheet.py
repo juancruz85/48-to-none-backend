@@ -5,11 +5,11 @@ TZWATZWATZWA!!!
 
 _____________________________________________________
 """
-###################################################################
+
 """
 DATASHEET CODE
 """
-#####################################################################
+
 """
 ABS:
 Datasheet is a class
@@ -45,23 +45,15 @@ delete cell
 
 
 """
-#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx
-
-
-
-
-
-
 
 
 """
 LIBS
 """
-#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 
-
-#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+import pandas as pd
 
 
 """
@@ -69,7 +61,6 @@ Glob Var
 """
 
 
-#####################################################
 """
 CLASSES
 """
@@ -81,7 +72,12 @@ __repr__ allows you to see the set data for a given object.
 
 
 """
-@dataclass 
+def D_dates(column):
+    dayfirst = not column.astype(str).str.match(r"\d{4}-").any()
+    return pd.to_datetime(column, errors="coerce", format="mixed", dayfirst=dayfirst)
+
+
+@dataclass(eq=False)
 class Sheet:
     """Datasheet object for a specific CSV-backed sheet.
 
@@ -98,18 +94,20 @@ class Sheet:
     # class for a respective datasheet.
     # has transaction history, has date, has specific data (please fill in later)
 
-    # add method to reset datasheet
-    # add method to sort rows/columns based on metadata and history
-    # add method to vet/check entries for accuracy before export
-    # add method to move a cell from one location to another
-    # add method to delete a cell or record from the sheet
+    # sheet_id is the sheet's identity. it never changes, so results can always be routed back to the right sheet.
+    sheet_id: str
+    data: pd.DataFrame = field(repr=False)
+    source: str = ""
 
-    # future metadata fields:
-    # transaction_history: list = field(default_factory=list)
-    # log_dates: list[str] = field(default_factory=list)
-    # person_name: str = ""
-    # banks: list[str] = field(default_factory=list)
-    # places: list[str] = field(default_factory=list)
+    # metadata fields:
+    transaction_history: list = field(default_factory=list)
+    log_dates: list[str] = field(default_factory=list)
+    person_name: str = ""
+    banks: list[str] = field(default_factory=list)
+    places: list[str] = field(default_factory=list)
+
+    # analysis output and model responses get attached here so they stay with their sheet.
+    results: dict = field(default_factory=dict)
 
     # Variable to toggle once a data sheet is sorted/validated.
 
@@ -119,15 +117,71 @@ class Sheet:
     
     is_sorted: bool = False
 
-    pass
-######################################################################################3
+    def __post_init__(self):
+        self._original = self.data.copy()
 
+    def _log(self, action, **details):
+        #every action is recorded in transaction history with a matching log date.
+        self.transaction_history.append({"action": action, **details})
+        self.log_dates.append(datetime.now().isoformat(timespec="seconds"))
+
+    def _check(self, row, column):
+        if row not in self.data.index or column not in self.data.columns:
+            raise KeyError(f"{self.sheet_id}: no cell at row {row!r}, column {column!r}")
+
+    def reset(self):
+        #put the data back to how it was loaded from the csv.
+        self.data = self._original.copy()
+        self.is_sorted = False
+        self._log("reset")
+
+    def sort(self, by="Date", ascending=True):
+        #sort rows by a column. rows are renumbered from 0 afterwards.
+        key = D_dates if by == "Date" else None
+        self.data = self.data.sort_values(by, ascending=ascending, key=key).reset_index(drop=True)
+        self.is_sorted = True
+        self._log("sort", by=by, ascending=ascending)
+
+    def vet(self):
+        #check entries before export. returns a list of problems, empty means the sheet is clean.
+        problems = []
+        if self.data.empty:
+            problems.append("sheet has no rows")
+        for column in self.data.columns[self.data.isna().any()]:
+            problems.append(f"{column}: missing values")
+        for column in self.data.columns:
+            values = self.data[column].dropna()
+            if column.startswith("Amount"):
+                bad = values[pd.to_numeric(values, errors="coerce").isna()]
+            elif column == "Date":
+                bad = values[D_dates(values).isna()]
+            else:
+                continue
+            if not bad.empty:
+                problems.append(f"{column}: unreadable values {bad.tolist()}")
+        self._log("vet", problems=len(problems))
+        return problems
+
+    def move_cell(self, source, target):
+        #source and target are (row, column). the source cell is left empty.
+        self._check(*source)
+        self._check(*target)
+        self.data.loc[target[0], target[1]] = self.data.loc[source[0], source[1]]
+        self.data.loc[source[0], source[1]] = None
+        self._log("move_cell", source=source, target=target)
+
+    def delete_cell(self, row, column=None):
+        #empties one cell, or with no column given deletes the whole record (row).
+        if column is None:
+            self._check(row, self.data.columns[0])
+            self.data = self.data.drop(index=row)
+        else:
+            self._check(row, column)
+            self.data.loc[row, column] = None
+        self._log("delete_cell", row=row, column=column)
 
 
 
 """
 Functions
 """
-
-
-##################################################################

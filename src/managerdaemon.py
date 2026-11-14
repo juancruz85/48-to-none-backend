@@ -69,15 +69,19 @@ Autonomous for application.
 *** LIBRARIES ***
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from . import msm as ms
+from . import mattsheet as ds
 
 """
 [[[ GLOBAL VARIABLES ]]]
 """
 
-
+# data enters
+sheets = {}
 
 """
 === FUNCTIONS ===
@@ -89,18 +93,44 @@ D = data
 """
 
 
-def D_createsheet(csv):
+def D_load(data_dir):
+    global sheets
+    paths = sorted(Path(data_dir).glob("*.csv"))
+    if not paths:
+        raise FileNotFoundError(f"No csv input found in {data_dir}")
+    sheets = {path.name: D_createsheet(path) for path in paths}
+    return sheets
+
+
+def start_services():
+    #start backend, api, frontend
+    print("start_services called")
+
+
+def D_createsheet(csv, person_name="", banks=None):
     #you'll need to have the watchdog create the datasheet objects from the csvs.
-    pass
+    #one sheet per csv. the file name is the sheet's identity.
+    csv = Path(csv)
+    data = pd.read_csv(csv)
+    places = sorted(set(data["Description"].dropna())) if "Description" in data.columns else []
+    return ds.Sheet(
+        sheet_id=csv.name,
+        data=data,
+        source=str(csv),
+        person_name=person_name,
+        banks=list(banks or []),
+        places=places,
+    )
 
 
-def D_organize(data):
+def D_organize(sheet):
     #Organize
     #use the actions in datasheet.
-
-
-
-    pass
+    #sorts by date, vets, and keeps the vet problems on the sheet. same sheet comes back out.
+    if "Date" in sheet.data.columns:
+        sheet.sort("Date")
+    sheet.results["vet"] = sheet.vet()
+    return sheet
 
 def D_send(data = "blank" ): #default arg is a ruler
     #send to model then return
@@ -125,7 +155,6 @@ def D_result(results):
 
     
 
-#_________________________________________________________________
 
 def start():
     """Begin manager startup without running work during module import."""
