@@ -38,3 +38,4 @@ def c_check(variable):
     print(type(variable))
     print(f'current value: type{variable=}\n')
 
+

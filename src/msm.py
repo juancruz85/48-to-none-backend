@@ -87,6 +87,7 @@ def togglestate():
 #global vars
     global toggleallow
     global operationalstate
+    global errorstate
 #logic block
     if toggleallow is not False:
 
@@ -98,16 +99,52 @@ def togglestate():
             z = operationalstate
             return z and x
         
-        elif errorstate is not False and errorstate is not True:
+        elif operationalstate is not False and errorstate is not True:
 
             errorstate = True
             operationalstate = False
             x = operationalstate
             z = errorstate
             return z and x
+        
+        elif operationalstate is False and errorstate is False:
+
+            operationalstate = True
+            return operationalstate
+
 #in case of toggleallow false
     else:
         print(f'Toggle unsuccessful! :(')        
+
+#_______________________________________________________
+
+def initial_msm():
+    #global vars
+    global toggleallow
+    global operationalstate
+    global errorstate
+    #initial turn on toggle allow
+    toggleallow = True
+    togglestate()
+    #_______________________________
+
+
+
+def print_state():
+    #global vars
+    global toggleallow
+    global operationalstate
+    global errorstate
+
+    #_________________________
+
+    if errorstate is not False:
+        state = "errorstate"
+    else:
+        state = "operationalstate"
+    
+    print(state)
+
 
 
 #s2 - error
@@ -116,7 +153,10 @@ def togglestate():
 
 
 #_____________________________________________________________________
+initial_msm()
+print_state()
 togglestate()
+print_state()
 
 
 

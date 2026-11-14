@@ -38,7 +38,7 @@ DUTIES:
 notes:
 
 
-basically, the way this manager daemon works is that the manager is an active program that runs constantly.
+Basically, the way this manager daemon works is that the manager is an active program that runs constantly.
 During this constant runtime, it will either be in two states.
 
 Operational or Error

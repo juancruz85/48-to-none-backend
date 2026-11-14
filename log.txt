@@ -12,6 +12,8 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 
 >>> Mass framework development. Updated some naming conventions.
 
+>>> Abstraction to many modules. Also added common.py allowing us to write common functions that will be used everywhere.
+
 
 
 
