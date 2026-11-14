@@ -71,7 +71,7 @@ Autonomous for application.
 
 import numpy as np
 import pandas as pd
-from . import msm
+from . import msm as ms
 
 """
 [[[ GLOBAL VARIABLES ]]]
@@ -126,16 +126,11 @@ def D_result(results):
 Operational Code
 """
 
-while msm.operationalstateoperationalstate is not False:
+while ms.operationalstate is not False:
     #run usual routine periodic
-    #run
-
-
-
-
-
-
-
+    #also include log startup and error watchdog periodic
+    pass
+#if we recieve the error signal in this phase we must signal to abort all current processes then enter error mode.
 
 
 
