@@ -1,6 +1,9 @@
 """Manager state machine for the backend lifecycle."""
 
+import logging
 from enum import Enum
+
+log = logging.getLogger("manager")
 
 
 class State(str, Enum):
@@ -39,6 +42,7 @@ def transition(new_state):
     if new_state not in _TRANSITIONS[state]:
         raise ValueError(f"Invalid lifecycle transition: {state.value} -> {new_state.value}")
 
+    log.info("state %s -> %s", state.value, new_state.value)
     state = new_state
     operationalstate = state is State.OPERATIONAL
     errorstate = state is State.ERROR

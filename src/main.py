@@ -98,19 +98,44 @@ def initialize(data_dir=DATA_DIR):
 
 def run(data_dir=DATA_DIR):
     """
-    The whole program: start up, then check every sheet for fraud.
+    The whole program: start up, then check every sheet for fraud, supervised.
 
-    Returns {sheet_id: dashboard entry}, or None if startup failed.
+    One sheet breaking only stops that sheet: its entry carries the error and the other sheets are still checked.
+    If startup fails or every sheet breaks, the manager stops work and tries to fix itself:
+    first recovery, then failsafe 1 (power cycle, initialize is recalled), and the work is tried again after each.
+    If nothing helps, failsafe 2 writes a report for the dev team.
+
+    Returns {sheet_id: dashboard entry}, or None if it could not be fixed (manager is then in error state).
     """
-    if initialize(data_dir) is None:
-        return None
-    return MD.D_run()
+    MD.start_logging()
+    initialize(data_dir)
+    fixes = [
+        ("first try", None),
+        ("recovery", MD.recover),
+        ("failsafe 1 (power cycle)", lambda: initialize(data_dir)),
+    ]
+    for name, fix in fixes:
+        if fix is not None:
+            MD.log.warning("trying %s", name)
+            fix()
+        if ms.state is ms.State.OPERATIONAL:
+            try:
+                return MD.D_run()
+            except Exception as error:
+                MD.report_error(error)
+    MD.failsafe2()
+    return None
 
 
 if __name__ == "__main__":
     results = run()
     ms.print_state()
+    if results is None:
+        print(f"run failed, last error: {ms.last_error!r}")
     for sheet_id, entry in (results or {}).items():
+        if entry["error"]:
+            print(f"\n{sheet_id}: FAILED, the other sheets were not affected: {entry['error']}")
+            continue
         if entry["vet"]:
             print(f"\n{sheet_id}: not checked, fix the data first: {entry['vet']}")
             continue

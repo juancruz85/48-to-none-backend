@@ -11,7 +11,6 @@ from .mattsheet import D_dates
 
 
 def prepare(df):
-    #puts any input layout into the one the analysis uses: Date, Item, Amount, Category, Transaction_Type.
     df = df.copy()
     bank_layout = "Description" in df.columns and "Item" not in df.columns
     df = df.rename(columns={"Amount (USD)": "Amount", "Description": "Item"})
@@ -136,8 +135,7 @@ def payment_frequency(paid):
 
 
 def irregular(df):
-    #shortlist of paid purchases that do not fit the person's normal pattern. the model decides which are fraud.
-    #df must come from prepare(). returns one dict per purchase with the facts and the signals that put it on the list.
+    #df must come from prepare().
     paid = df[df["Amount"] > 0]
     if paid.empty:
         return []
@@ -178,7 +176,7 @@ THEN FINAL WILL ROUTE TO DASHBOARD.
 """
 
 def report(df):
-    #df must come from prepare() or load(). returns the full analysis as text.
+    #df must come from prepare() or load().
     paid = df[df["Amount"] > 0]
     by_cat, by_price = common_purchases(paid)
     t = time_patterns(paid)

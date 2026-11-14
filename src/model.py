@@ -28,18 +28,15 @@ SYSTEM = (
 
 VERDICT = re.compile(r"\b(FRAUD|OK)\b\W*(.*)", re.IGNORECASE)
 
-# the loaded model, None until load() is called.
 _pipe = None
 
 
 def load():
-    #calling it again does nothing.
     global _pipe
     if _pipe is None:
         import torch
         from transformers import pipeline
 
-        #gpu if there is one (cuda on aws, mps on a mac), else cpu.
         device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
         _pipe = pipeline("text-generation", model=MODEL_ID, device=device, dtype="auto")
     return _pipe
@@ -47,7 +44,6 @@ def load():
 
 def respond(sheet):
     #the model is asked about one purchase at a time (it skips purchases when given the whole list at once).
-    #returns the purchases the model flagged as fraud, each with the model's reason.
     fraud = []
     for p in sheet.results["irregular"]:
         question = (

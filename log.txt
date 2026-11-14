@@ -29,7 +29,7 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 2. Build the startup path: initialize the manager, load the input data, and start backend services. - done by Juan Commit #35
 3. Implement data handling: create one sheet per input, attach metadata, and preserve each sheet’s identity through analysis and response. - done by Juan Commit #37
 4. Connect the AI and dashboard flow: send data to the model, collect results, and route them back with their original batch. - done by Juan Commit #37
-5. Add supervision: log activity, check for errors, stop work during failures, attempt recovery, then restart or report the issue to the development team.
+5. Add supervision: log activity, check for errors, stop work during failures, attempt recovery, then restart or report the issue to the development team. - done by Juan Commit #39
 6. Add request handling and refresh routines: support concurrent work across sheets while preventing simultaneous edits to the same sheet.
 
 
@@ -86,3 +86,37 @@ How to run the full system as it stands right now (fraud detection is the model'
 
 Juan Commit #38:
 Quick clean up of formatting
+
+Juan Commit #39:
+Step 5 is done. We now log what it does, stops work when something breaks, tries to fix itself, and reports to us team if it cannot.
+Also made it so if only one sheet breaks that only the things related to that sheet break. Everything else remains working. However
+no failsafes run if its only one sheet thats broken. 
+
+If its startup that failed however or every sheet breaks then it does the failsafe methods we previously discussed.
+Below are the detailed steps of what happens.
+
+What happens when something breaks
+1. ONE sheet breaks (bad layout, error while checking it): only that sheet stops. Its dashboard entry gets an "error" field saying what went wrong and its fraud is empty.
+   Every other sheet is still checked and the manager stays operational. No failsafes fire. The sheet is tried again from scratch on the next run.
+2. Startup fails, or EVERY sheet breaks in the same run (so the problem is the system, e.g. the model): the manager goes down this ladder, trying the work again after each one:
+   - report the error: logged with its traceback, manager enters error state, work stops (the state is checked before every sheet).
+   - recovery: checks the data is still loaded and reloads the model if needed. (recover in managerdaemon)
+   - failsafe 1, power cycle: initialize is recalled, so shutdown, reload the csvs and the model, start again.
+   - failsafe 2, cry to dev team: writes the error, traceback, manager state and loaded sheets to logs/dev_report.txtl, prints a loud message, and leaves the manager in error state. (failsafe2 in managerdaemon)
+   Heads up: with only one csv loaded, that one sheet breaking counts as "every sheet" and goes all the way to failsafe 2.
+
+Important Files and stuff to know
+- logs/manager.log: everything the manager does (state changes, sheets loaded, each sheet checked, errors with tracebacks). Read this first when something is off.
+- logs/dev_report.txt: only exists if failsafe 2 fired.
+- logs/ is in .gitignore, it is made on the first run.
+- main.run() returns None if the run could not be fixed. Dashboard entries now have one more field: error (empty when the sheet is fine).
+- Tests for all of this are in tests/test_supervision.py. Run every test with:
+  .venv/bin/python -m unittest tests.test_msm tests.test_startup tests.test_sheet tests.test_flow tests.test_supervision
+- To just run the program no tests (loads the csvs in purchase_data/, loads the model, and prints the AI's fraud replies):
+  .venv/bin/python -m src.main
+  prints the manager state, then for each csv the purchases the AI flagged as fraud with its reason
+
+Not done in step 5:
+- failsafe 2 only writes a file and prints. No alert yet, we decide where reports go later
+- recovery cannot fix bad data or a code bug
+- nothing watches in the background, errors are caught when an operation fails. errorcheck in msm is still the placeholder for a watchdog

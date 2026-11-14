@@ -99,7 +99,6 @@ class Sheet:
     data: pd.DataFrame = field(repr=False)
     source: str = ""
 
-    # metadata fields:
     transaction_history: list = field(default_factory=list)
     log_dates: list[str] = field(default_factory=list)
     person_name: str = ""
@@ -121,7 +120,6 @@ class Sheet:
         self._original = self.data.copy()
 
     def _log(self, action, **details):
-        #every action is recorded in transaction history with a matching log date.
         self.transaction_history.append({"action": action, **details})
         self.log_dates.append(datetime.now().isoformat(timespec="seconds"))
 
@@ -130,20 +128,18 @@ class Sheet:
             raise KeyError(f"{self.sheet_id}: no cell at row {row!r}, column {column!r}")
 
     def reset(self):
-        #put the data back to how it was loaded from the csv.
         self.data = self._original.copy()
         self.is_sorted = False
         self._log("reset")
 
     def sort(self, by="Date", ascending=True):
-        #sort rows by a column. rows are renumbered from 0 afterwards.
+        #rows are renumbered from 0 afterwards.
         key = D_dates if by == "Date" else None
         self.data = self.data.sort_values(by, ascending=ascending, key=key).reset_index(drop=True)
         self.is_sorted = True
         self._log("sort", by=by, ascending=ascending)
 
     def vet(self):
-        #check entries before export. returns a list of problems, empty means the sheet is clean.
         problems = []
         if self.data.empty:
             problems.append("sheet has no rows")
@@ -163,7 +159,7 @@ class Sheet:
         return problems
 
     def move_cell(self, source, target):
-        #source and target are (row, column). the source cell is left empty.
+        #source and target are (row, column).
         self._check(*source)
         self._check(*target)
         self.data.loc[target[0], target[1]] = self.data.loc[source[0], source[1]]
@@ -171,7 +167,6 @@ class Sheet:
         self._log("move_cell", source=source, target=target)
 
     def delete_cell(self, row, column=None):
-        #empties one cell, or with no column given deletes the whole record (row).
         if column is None:
             self._check(row, self.data.columns[0])
             self.data = self.data.drop(index=row)

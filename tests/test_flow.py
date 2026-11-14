@@ -34,6 +34,7 @@ class TestFlow(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.data_dir = Path(self.tmp.name)
+        MD.LOG_DIR = Path(self.tmp.name) / "logs"
         (self.data_dir / "bank.csv").write_text(BANK)
         (self.data_dir / "store.csv").write_text(STORE)
 
