@@ -34,3 +34,7 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 
 
 >>> Refactored the manager daemon and msm using codex then added tests using codex.
+
+Juan Commit #35:
+I went through and did Steps 2-3 as well as added two new tests specifically for the new features. Next will be step 4. 
+Ivan has also started work on frontend as well at this current time.
