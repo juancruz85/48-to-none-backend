@@ -14,6 +14,7 @@ The manager calls respond() once per sheet (see D_send in managerdaemon).
 import logging
 import re
 import threading
+import time
 from datetime import datetime
 
 MODEL_ID = "microsoft/Phi-4-mini-instruct"
@@ -29,7 +30,11 @@ SYSTEM = (
     "OK - <short reason>"
 )
 
-VERDICT = re.compile(r"\b(FRAUD|OK)\b\W*(.*)", re.IGNORECASE)
+# the verdict has to be the first word: "NOT FRAUD" or "no fraud here" must not count as fraud.
+VERDICT = re.compile(r"^\W*(FRAUD|OK)\b\W*(.*)", re.IGNORECASE)
+
+# seconds one question may take before the model counts as stuck (a normal one takes a few seconds).
+STALL_TIMEOUT = 120
 
 _pipe = None
 
@@ -40,6 +45,7 @@ replies.propagate = False
 
 # sheets are checked at the same time but there is one model, and it is not safe to run it from two threads at once.
 _lock = threading.Lock()
+_busy_since = None
 
 
 def load():
@@ -53,12 +59,31 @@ def load():
     return _pipe
 
 
+def _ask(sheet, messages):
+    global _busy_since
+    #waiting for a model that is answering other sheets counts as progress, waiting for a stuck one does not.
+    while not _lock.acquire(timeout=1):
+        started = _busy_since
+        if started is not None and time.monotonic() - started > STALL_TIMEOUT:
+            raise TimeoutError(f"the model has been stuck on one question for over {STALL_TIMEOUT} seconds")
+        sheet.touch()
+    try:
+        _busy_since = time.monotonic()
+        return load()(messages, max_new_tokens=40, return_full_text=False, do_sample=False)
+    finally:
+        _busy_since = None
+        _lock.release()
+        sheet.touch()
+
+
 def respond(sheet):
     #the model is asked about one purchase at a time (it skips purchases when given the whole list at once).
     fraud = []
     for p in sheet.results["irregular"]:
+        #one line and a sane length: the text comes straight from the csv and goes into the prompt and the reply log.
+        item = " ".join(str(p["item"]).split())[:120]
         question = (
-            f"{p['date']}, {p['item']}, ${p['amount']:.2f}. This person has paid for {p['item']} "
+            f"{p['date']}, {item}, ${p['amount']:.2f}. This person has paid for {item} "
             f"{p['times_seen']} time(s) in total, {p['times_bought']} time(s) at this price. "
             f"Stood out because: {'; '.join(p['signals'])}."
         )
@@ -66,8 +91,7 @@ def respond(sheet):
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": question},
         ]
-        with _lock:
-            output = load()(messages, max_new_tokens=40, return_full_text=False, do_sample=False)
+        output = _ask(sheet, messages)
         reply = output[0]["generated_text"].strip()
         verdict = VERDICT.search(reply)
         replies.info(

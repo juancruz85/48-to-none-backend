@@ -20,7 +20,7 @@ STORE = (
 
 
 def fake_model(sheet):
-    return f"model saw {sheet.sheet_id} with {len(sheet.data)} rows"
+    return [{"seen": sheet.sheet_id, "rows": len(sheet.data)}]
 
 
 class TestFlow(unittest.TestCase):
@@ -56,7 +56,7 @@ class TestFlow(unittest.TestCase):
         self.assertEqual(sorted(payloads), ["bank.csv", "store.csv"])
         for sheet_id, payload in payloads.items():
             rows = len(MD.sheets[sheet_id].data)
-            expected = f"model saw {sheet_id} with {rows} rows"
+            expected = [{"seen": sheet_id, "rows": rows}]
             self.assertEqual(payload["sheet_id"], sheet_id)
             self.assertEqual(payload["fraud"], expected)
             self.assertEqual(MD.sheets[sheet_id].results["fraud"], expected)
@@ -92,7 +92,7 @@ class TestFlow(unittest.TestCase):
         with mock.patch("src.model.respond", fake_model):
             result = MD.D_send(sheet)
 
-        self.assertEqual(result, {"sheet_id": "bank.csv", "response": "model saw bank.csv with 2 rows"})
+        self.assertEqual(result, {"sheet_id": "bank.csv", "response": [{"seen": "bank.csv", "rows": 2}]})
 
 
     def test_irregular_shortlists_what_does_not_fit(self):

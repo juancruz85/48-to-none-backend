@@ -53,6 +53,8 @@ this fuction will be recalled when failsafe 1 kicks in.
 
 """ LIBS """
 
+import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -135,8 +137,12 @@ def serve(data_dir=DATA_DIR, interval=30, cycles=None):
 
     Runs until stopped (ctrl-c), or for `cycles` refreshes if given. Returns the dashboard, or None if run() could not be fixed.
     """
+    interval = float(interval)
+    if not interval >= 0:
+        raise ValueError(f"interval must be 0 or more seconds, got {interval}")
     results = run(data_dir)
     show(results)
+    show_unreadable()
     done = 0
     try:
         while results is not None and (cycles is None or done < cycles):
@@ -150,7 +156,8 @@ def serve(data_dir=DATA_DIR, interval=30, cycles=None):
                 show(results)
     except KeyboardInterrupt:
         pass
-    MD.shutdown()
+    finally:
+        MD.shutdown()
     return None if results is None else dict(MD.dashboard)
 
 
@@ -163,17 +170,33 @@ def show(results):
             print(f"\n{sheet_id}: not checked, fix the data first: {entry['vet']}")
             continue
         print(f"\n{sheet_id}: {len(entry['fraud'])} possible fraud out of {len(entry['irregular'])} irregular purchases")
+        if entry["irregular_total"] > len(entry["irregular"]):
+            print(f"  ({entry['irregular_total']} purchases looked irregular, only the {len(entry['irregular'])} strongest were sent to the AI)")
         for purchase in entry["fraud"]:
-            print(f"  row {purchase['row']} | {purchase['date']} | {purchase['item']} | ${purchase['amount']:.2f} | {purchase['reason']}")
+            print(f"  row {purchase['row']} | {purchase['date']} | {purchase['item'][:60]} | ${purchase['amount']:.2f} | {purchase['reason']}")
+
+
+def show_unreadable():
+    for name, why in MD.unreadable.items():
+        print(f"\n{name}: could not be read, skipped: {why}")
 
 
 if __name__ == "__main__":
     # "python -m src.main" checks everything once. "python -m src.main serve [seconds]" stays up and refreshes.
     if sys.argv[1:2] == ["serve"]:
-        results = serve(interval=float(sys.argv[2]) if len(sys.argv) > 2 else 30)
+        try:
+            results = serve(interval=sys.argv[2] if len(sys.argv) > 2 else 30)
+        except ValueError as bad_interval:
+            sys.exit(f"usage: python -m src.main serve [seconds between refreshes]  ({bad_interval})")
     else:
         results = run()
         show(results)
+        show_unreadable()
     ms.print_state()
     if results is None:
         print(f"run failed, last error: {ms.last_error!r}")
+    if MD.abandoned:
+        #a stuck sheet's thread never ends, and python waits for every thread before it exits. this is the only way out.
+        logging.shutdown()
+        sys.stdout.flush()
+        os._exit(1)

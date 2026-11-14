@@ -178,11 +178,16 @@ class TestRequests(unittest.TestCase):
         self.assertEqual(msm.state, msm.State.OPERATIONAL)
 
     def test_serve_refreshes_then_shuts_down(self):
+        real_sleep = time.sleep
+
         def add_a_csv(seconds):
-            self.write("late.csv")
+            if seconds == 7:
+                self.write("late.csv")
+            else:
+                real_sleep(seconds)
 
         with mock.patch("time.sleep", side_effect=add_a_csv):
-            results = main.serve(self.data_dir, interval=0, cycles=1)
+            results = main.serve(self.data_dir, interval=7, cycles=1)
 
         self.assertEqual(sorted(results), ["a.csv", "b.csv", "late.csv"])
         self.assertEqual(msm.state, msm.State.STOPPED)

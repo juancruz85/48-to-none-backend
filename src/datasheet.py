@@ -19,6 +19,8 @@ def prepare(df):
     if bank_layout:
         #bank exports record money spent as negative, the analysis counts spending as positive.
         df["Amount"] = -df["Amount"]
+    #an item column of only numbers is read as numbers, and the rest of the analysis expects text.
+    df["Item"] = df["Item"].astype(str)
     df["Category"] = df["Item"].map(categorize)
     if "Transaction_Type" not in df.columns:
         df["Transaction_Type"] = df.apply(transaction_type, axis=1)

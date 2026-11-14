@@ -1,6 +1,7 @@
 """Manager state machine for the backend lifecycle."""
 
 import logging
+import threading
 from enum import Enum
 
 log = logging.getLogger("manager")
@@ -23,6 +24,9 @@ errorstate = False
 toggleallow = True
 errordetected = False
 
+# sheets are worked on from several threads, and any of them can report an error.
+_lock = threading.RLock()
+
 _TRANSITIONS = {
     State.STOPPED: {State.STARTING},
     State.STARTING: {State.OPERATIONAL, State.ERROR, State.STOPPED},
@@ -37,17 +41,18 @@ def transition(new_state):
     global state, operationalstate, errorstate, errordetected
 
     new_state = State(new_state)
-    if new_state == state:
-        return state
-    if new_state not in _TRANSITIONS[state]:
-        raise ValueError(f"Invalid lifecycle transition: {state.value} -> {new_state.value}")
+    with _lock:
+        if new_state == state:
+            return state
+        if new_state not in _TRANSITIONS[state]:
+            raise ValueError(f"Invalid lifecycle transition: {state.value} -> {new_state.value}")
 
-    log.info("state %s -> %s", state.value, new_state.value)
-    state = new_state
-    operationalstate = state is State.OPERATIONAL
-    errorstate = state is State.ERROR
-    errordetected = errorstate
-    return state
+        log.info("state %s -> %s", state.value, new_state.value)
+        state = new_state
+        operationalstate = state is State.OPERATIONAL
+        errorstate = state is State.ERROR
+        errordetected = errorstate
+        return state
 
 
 def start():

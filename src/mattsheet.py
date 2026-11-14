@@ -51,6 +51,7 @@ delete cell
 LIBS
 """
 from dataclasses import dataclass, field
+import time
 from datetime import datetime
 
 import pandas as pd
@@ -74,7 +75,8 @@ __repr__ allows you to see the set data for a given object.
 """
 def D_dates(column):
     dayfirst = not column.astype(str).str.match(r"\d{4}-").any()
-    return pd.to_datetime(column, errors="coerce", format="mixed", dayfirst=dayfirst)
+    #utc then stripped, because one column mixing dates with and without a timezone cannot be parsed otherwise.
+    return pd.to_datetime(column, errors="coerce", format="mixed", dayfirst=dayfirst, utc=True).dt.tz_localize(None)
 
 
 @dataclass(eq=False)
@@ -118,6 +120,11 @@ class Sheet:
 
     def __post_init__(self):
         self._original = self.data.copy()
+        self.touch()
+
+    def touch(self):
+        #work on a sheet calls this as it makes progress. the manager gives up on a sheet that goes quiet for too long.
+        self.active = time.monotonic()
 
     def _log(self, action, **details):
         self.transaction_history.append({"action": action, **details})
@@ -148,7 +155,8 @@ class Sheet:
         for column in self.data.columns:
             values = self.data[column].dropna()
             if column.startswith("Amount"):
-                bad = values[pd.to_numeric(values, errors="coerce").isna()]
+                numbers = pd.to_numeric(values, errors="coerce")
+                bad = values[numbers.isna() | (numbers.abs() == float("inf"))]
             elif column == "Date":
                 bad = values[D_dates(values).isna()]
             else:
