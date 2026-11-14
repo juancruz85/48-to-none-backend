@@ -32,6 +32,9 @@ def c_toggle(variable):
     return variable
 
 
-def c_check
 
+#checks any variable and returns it's value and type at a given moment
+def c_check(variable):
+    print(type(variable))
+    print(f'current value: type{variable=}\n')
 

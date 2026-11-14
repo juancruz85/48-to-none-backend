@@ -36,6 +36,14 @@ essentially metadata^^
 using this meta data and history we can reorganize it and vet it (vet meaning analyze/check if it's right) to the manager than the manager can send it over to the
 
 
+datasheet subactions:
+move cell
+delete cell
+
+
+
+
+
 """
 #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx
 
