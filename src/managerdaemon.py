@@ -134,4 +134,14 @@ while ms.operationalstate is not False:
 
 
 
+"""
+Error Code
+"""
 
+#Stop, Diagnose, Decide, and report.
+
+
+while ms.errorstate is not False:
+    #stopall func.
+    ms.hardstop()
+    

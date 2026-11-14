@@ -62,6 +62,7 @@ import pandas as pd
 operationalstate = False
 errorstate = False
 toggleallow = False
+errordetected = False
 
 
 
@@ -150,7 +151,21 @@ def print_state():
     print(state)
 
 
+def errorcheck():
+    global errordetected
+    #error check runs error check across all actions and systems.
+    pass
 
+
+
+def hardstop():
+    global errordetected
+    if errordetected is not False:
+        #insert all stop commands
+        pass
+    else:
+        #still insert stop commands becasue this is absolute
+        pass
 
 
 

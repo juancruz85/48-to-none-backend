@@ -33,7 +33,7 @@ bank(s) -> add logic for variable banks
 places
 
 essentially metadata^^
-using this meta data and history we can reorganize it and vet it (vet meaning analyze/check if it's right) to the manager than the manager can send it over to the
+using this metadata and history we can reorganize it and vet it (vet meaning analyze/check if it's right) to the manager than the manager can send it over to the
 
 
 datasheet subactions:
@@ -68,12 +68,8 @@ from dataclasses import dataclass
 Glob Var
 """
 
-"""
-Functions
-"""
 
-
-##############################################################
+#####################################################
 """
 CLASSES
 """
@@ -87,13 +83,46 @@ __repr__ allows you to see the set data for a given object.
 """
 @dataclass 
 class Sheet:
-    #class for a respective datasheet.
-    #has transaction history, has date, has specific data (please fill in later)
+    """Datasheet object for a specific CSV-backed sheet.
 
-    #add method to reset datasheet
+    Planned features and metadata:
+    - transaction history: records of all actions and entries
+    - log dates: timestamp tracking for each transaction or update
+    - person name: who created/owns the sheet or submitted the data
+    - bank(s): support for one or more bank sources/targets
+    - places: location metadata tied to entries
+    - sheet metadata: reusable information used to organize, analyze, and vet records
+    - data actions: move cell, delete cell, add/remove rows/columns, sort, reset
+    """
 
-    #Variable to toggle once a data sheet is 
+    # class for a respective datasheet.
+    # has transaction history, has date, has specific data (please fill in later)
+
+    # add method to reset datasheet
+    # add method to sort rows/columns based on metadata and history
+    # add method to vet/check entries for accuracy before export
+    # add method to move a cell from one location to another
+    # add method to delete a cell or record from the sheet
+
+    # future metadata fields:
+    # transaction_history: list = field(default_factory=list)
+    # log_dates: list[str] = field(default_factory=list)
+    # person_name: str = ""
+    # banks: list[str] = field(default_factory=list)
+    # places: list[str] = field(default_factory=list)
+
+    # Variable to toggle once a data sheet is sorted/validated.
     is_sorted: bool = False
 
     pass
 ######################################################################################3
+
+
+
+
+"""
+Functions
+"""
+
+
+##################################################################

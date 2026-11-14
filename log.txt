@@ -18,6 +18,6 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 
 >>> Usual machine periodic. Other logic and abstraction in-depth.
 
-
+>>> Updated some logic and imported the correct modules into main.
 
 
