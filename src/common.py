@@ -32,3 +32,6 @@ def c_toggle(variable):
     return variable
 
 
+def c_check
+
+
