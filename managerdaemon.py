@@ -48,12 +48,12 @@ import pandas as pd
 
 
 
-def A1(data):
-    #
+def Data(data):
+    #Organize
     pass
 
 def A2(data):
-    #organize 
+    #send to model then return
     pass
 
 def A3(results):
