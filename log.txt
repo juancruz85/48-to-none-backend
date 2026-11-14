@@ -8,7 +8,7 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 >>> Added log, Daemon state machine.
 >>> Added simple logic to daemon state machine
 
-
+>>> Added Mattsheet.py, note to all. I am laying framework then leaving legit coding and syntax logic for later so if I comment something and there is no code then the comment dictates exactly what to code.
 
 
 
