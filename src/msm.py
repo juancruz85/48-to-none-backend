@@ -42,14 +42,18 @@ toggleallow = False
 #yada yada
 #coast vs stop in state
 
+
+
 #s1 - operational
 # if not error variable == true then assume operational. Operational handles actions
 
 
 def toggle():
     global toggleallow
+    global operationalstate
+
     if toggleallow:
-        global operationalstate
+
         if operationalstate is False and errorstate is True:
 
             operationalstate = True
@@ -80,19 +84,3 @@ def toggle():
 
 
 #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

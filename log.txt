@@ -1,0 +1,18 @@
+Hallo! welcome to the log.
+
+
+
+This is Matt. He denotes with a ">>>" so look out for that to see what he changed.
+
+
+>>> Added log, Daemon state machine.
+
+
+
+
+
+
+
+
+
+
