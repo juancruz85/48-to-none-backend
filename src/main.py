@@ -158,6 +158,7 @@ def serve(data_dir=DATA_DIR, interval=30, cycles=None):
         pass
     finally:
         MD.shutdown()
+        MD.stop_logging()
     return None if results is None else dict(MD.dashboard)
 
 
@@ -195,6 +196,7 @@ if __name__ == "__main__":
     ms.print_state()
     if results is None:
         print(f"run failed, last error: {ms.last_error!r}")
+    MD.stop_logging()
     if MD.abandoned:
         #a stuck sheet's thread never ends, and python waits for every thread before it exits. this is the only way out.
         logging.shutdown()

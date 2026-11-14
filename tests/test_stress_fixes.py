@@ -32,6 +32,7 @@ class StressCase(unittest.TestCase):
         self.addCleanup(MD.abandoned.clear)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(MD.stop_logging)
         self.data_dir = Path(self.tmp.name) / "data"
         self.data_dir.mkdir()
         (self.data_dir / "a.csv").write_text(GOOD)
@@ -102,13 +103,23 @@ class TestBadFilesAtStartup(StressCase):
         (self.data_dir / "empty.csv").write_text("")
         (self.data_dir / "latin.csv").write_bytes("Date,Item,Amount (USD)\n2026-01-01,Caf\xe9,5.00\n".encode("latin-1"))
         (self.data_dir / "folder.csv").mkdir()
-        (self.data_dir / "link.csv").symlink_to(self.data_dir / "nowhere")
+        try:
+            (self.data_dir / "link.csv").symlink_to(self.data_dir / "nowhere")
+        except OSError:
+            # Windows may require Developer Mode or elevated privileges for symlinks.
+            pass
         locked = self.data_dir / "locked.csv"
         locked.write_text(GOOD)
-        locked.chmod(0)
-        self.addCleanup(locked.chmod, 0o644)
 
-        results = main.run(self.data_dir)
+        real_read_csv = MD.pd.read_csv
+
+        def read_with_locked_file(path, *args, **kwargs):
+            if Path(path).name == "locked.csv":
+                raise PermissionError("test file is unreadable")
+            return real_read_csv(path, *args, **kwargs)
+
+        with mock.patch.object(MD.pd, "read_csv", side_effect=read_with_locked_file):
+            results = main.run(self.data_dir)
 
         self.assertEqual(msm.state, msm.State.OPERATIONAL)
         self.assertEqual(sorted(results), ["a.csv", "b.csv"])

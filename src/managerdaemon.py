@@ -204,6 +204,7 @@ def D_organize(sheet):
 def D_analyze(sheet):
     prepared = da.prepare(sheet.data)
     sheet.results["analysis"] = da.report(prepared)
+    sheet.results["profile"] = da.profile(prepared)
     found = da.irregular(prepared)
     strongest = sorted(found, key=lambda p: (-len(p["signals"]), -p["amount"]))[:MODEL_LIMIT]
     sheet.results["irregular"] = sorted(strongest, key=lambda p: p["row"])
@@ -416,6 +417,17 @@ def start_logging():
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
     return True
+
+
+def stop_logging():
+    """Close managed log files so callers can safely remove or rotate logs."""
+    for logger in (log, mo.replies):
+        for handler in list(logger.handlers):
+            if isinstance(handler, logging.FileHandler):
+                logger.removeHandler(handler)
+                handler.close()
+        if not logger.handlers:
+            logger.addHandler(logging.NullHandler())
 
 
 def recover():

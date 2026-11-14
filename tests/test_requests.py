@@ -28,6 +28,7 @@ class TestRequests(unittest.TestCase):
         self.addCleanup(MD.stop_requests)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(MD.stop_logging)
         self.data_dir = Path(self.tmp.name) / "data"
         self.data_dir.mkdir()
         self.write("a.csv")

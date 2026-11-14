@@ -25,6 +25,7 @@ class TestSupervision(unittest.TestCase):
         self.addCleanup(mock.patch.stopall)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(MD.stop_logging)
         self.data_dir = Path(self.tmp.name) / "data"
         self.data_dir.mkdir()
         (self.data_dir / "a.csv").write_text(BANK)

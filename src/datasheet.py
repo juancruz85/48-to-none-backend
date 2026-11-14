@@ -171,6 +171,50 @@ def irregular(df):
     return rows
 
 
+def profile(df, max_items=8, max_months=6):
+    """Build compact whole-sheet context for batched fraud review."""
+    paid = df[df["Amount"] > 0]
+    if paid.empty:
+        return {
+            "transactions": len(df),
+            "paid_transactions": 0,
+            "median_paid_amount": None,
+            "frequent_items": [],
+            "recent_monthly_spend": [],
+        }
+
+    frequent = (
+        paid.groupby("Item")["Amount"]
+        .agg(purchases="count", median_amount="median")
+        .sort_values(["purchases", "median_amount"], ascending=[False, False])
+        .head(max_items)
+    )
+    monthly = (
+        paid.assign(Month=paid["Date"].dt.to_period("M"))
+        .groupby("Month")["Amount"]
+        .sum()
+        .sort_index()
+        .tail(max_months)
+    )
+    return {
+        "transactions": len(df),
+        "paid_transactions": len(paid),
+        "median_paid_amount": round(float(paid["Amount"].median()), 2),
+        "frequent_items": [
+            {
+                "item": " ".join(str(item).split())[:80],
+                "purchases": int(row.purchases),
+                "median_amount": round(float(row.median_amount), 2),
+            }
+            for item, row in frequent.iterrows()
+        ],
+        "recent_monthly_spend": [
+            {"month": str(month), "amount": round(float(amount), 2)}
+            for month, amount in monthly.items()
+        ],
+    }
+
+
 """
 ALL PRINT STATEMENTS ARE ROUTED AS A RETURN VALUE (report) WHICH IS GIVEN TO THE AI MODEL.
 

@@ -159,3 +159,15 @@ We should also test this model with more data and really find out real numbers w
 
 Basically get it ready as if we were gonna turn it in tonight. Then I think with the base we can add fancy features we brainstormed last night.
 Good luck next shift.
+
+>>> Enter Matt shift 12:00pm
+- Read git changes and log, preparing gameplan
+- Debrief lead to conclusions about AI conflicts when analyzing. AI model will read indiv purchases which is inefficient.
+- Possible fixes are to implement a secondary manager to create data trends and then have the AI analyze that too.
+- Max AI concurrent reads are 50.
+- Man the Manager seems to have been updated to only stop the corrupted sheet in question, meaning it can handle multiple errors
+- Question: Does man the manager recognize wholistic errors, for example if the whole backend corrupts will it reset it?
+- Should we implement a tertiary manager to keep both man and the hypothetical data manager in check?
+- Another fix we suggest for the model only reading singular purchases is to slice a singular csv into parts that an AI can speed read.
+
+- Goals: Feed data to model, extensively test and vet programs, add new features only if required.
