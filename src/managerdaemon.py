@@ -127,25 +127,34 @@ def D_result(results):
 
 #_________________________________________________________________
 
-"""
-Operational Code
-"""
-
-while ms.operationalstate is not False:
-    #run usual routine periodic
-    #also include log startup and error watchdog periodic
-    pass
-#if we recieve the error signal in this phase we must signal to abort all current processes then enter error mode.
+def start():
+    """Begin manager startup without running work during module import."""
+    return ms.start()
 
 
-
-"""
-Error Code
-"""
-
-#Stop, Diagnose, Decide, and report.
+def startup_succeeded():
+    """Mark backend initialization complete."""
+    return ms.startup_succeeded()
 
 
-while ms.errorstate is not False:
-    #stopall func.
+def report_error(error):
+    """Enter error state and invoke the stop hook for active work."""
+    ms.enter_error(error)
     ms.hardstop()
+    return ms.state
+
+
+def begin_recovery():
+    return ms.begin_recovery()
+
+
+def recovery_succeeded():
+    return ms.recovery_succeeded()
+
+
+def recovery_failed(error=None):
+    return ms.recovery_failed(error)
+
+
+def shutdown():
+    return ms.shutdown()

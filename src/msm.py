@@ -1,204 +1,124 @@
-"""
-_______________________________________________________
+"""Manager state machine for the backend lifecycle."""
 
-TZWATZWATZWA!!!
-
-_____________________________________________________
-
-MANAGER STATE MACHINE
-AKA "MSM"
-__________________________________________________
-
-S1:
-OPERATIONAL
-    routines and actions to imp
-
-    ---sequential
-    1. Wakeup routine - msm
-    2. Run error watchdog - subaction (if error watchdog detects error then togglestate)
-    3. Keep log
-    4. activate full green protocol
-    --- concurrent routines and actions (full green protocol)
-    *** Work as intended
-    1. Create datasheet object based on inputted csv
-    2. organize and attatch metadata (keep everything batched)
-    3. send to AI model
-    4. recapture AI results, organise them with the same batch and then send to dashboard.
-    5. manage AI crossreference requests.
-    6. Manage requests
+from enum import Enum
 
 
-S2:
-ERROR
-    routines and actions
-
-    1. Stop all concurrent and all operations
-    2. Save log
-    3. Diagnose
-    4. Attempt to fix
-    5. Either complete fix and toggle or use safeguard 1
-    ---
-    5.5. if safeguard 1 is in place then diagnose again and either toggle or activate safeguard 2
-    5.7. wait for resolution if safeguard 2
+class State(str, Enum):
+    STOPPED = "stopped"
+    STARTING = "starting"
+    OPERATIONAL = "operational"
+    ERROR = "error"
+    RECOVERING = "recovering"
 
 
-"""
+state = State.STOPPED
+last_error = None
 
-
-
-
-"""
-*** LIBRARIES ***
-"""
-
-import numpy as np
-import pandas as pd
-
-
-"""
-[[[ GLOBAL VARIABLES ]]]
-"""
-
+# Compatibility flags for existing code while it moves to ``state``.
 operationalstate = False
 errorstate = False
-toggleallow = False
+toggleallow = True
 errordetected = False
 
+_TRANSITIONS = {
+    State.STOPPED: {State.STARTING},
+    State.STARTING: {State.OPERATIONAL, State.ERROR, State.STOPPED},
+    State.OPERATIONAL: {State.ERROR, State.STOPPED},
+    State.ERROR: {State.RECOVERING, State.STOPPED},
+    State.RECOVERING: {State.OPERATIONAL, State.ERROR, State.STOPPED},
+}
 
 
+def transition(new_state):
+    """Move to a valid lifecycle state and return it."""
+    global state, operationalstate, errorstate, errordetected
 
-"""
-=== FUNCTIONS ===
-"""
+    new_state = State(new_state)
+    if new_state == state:
+        return state
+    if new_state not in _TRANSITIONS[state]:
+        raise ValueError(f"Invalid lifecycle transition: {state.value} -> {new_state.value}")
 
-#handle state
-#switch state
-#allow actions
-#yada yada
-#coast vs stop in state
-
-#s1 - operational
-# if not error variable == true then assume operational. Operational handles actions
-
-#s2 - error
-# if error send diagnose
-
+    state = new_state
+    operationalstate = state is State.OPERATIONAL
+    errorstate = state is State.ERROR
+    errordetected = errorstate
+    return state
 
 
+def start():
+    """Enter startup; callers mark startup complete or failed explicitly."""
+    return transition(State.STARTING)
 
+
+def startup_succeeded():
+    return transition(State.OPERATIONAL)
+
+
+def enter_error(error=None):
+    global last_error
+    last_error = error
+    return transition(State.ERROR)
+
+
+def begin_recovery():
+    return transition(State.RECOVERING)
+
+
+def recovery_succeeded():
+    global last_error
+    last_error = None
+    return transition(State.OPERATIONAL)
+
+
+def recovery_failed(error=None):
+    global last_error
+    if error is not None:
+        last_error = error
+    return transition(State.ERROR)
+
+
+def shutdown():
+    return transition(State.STOPPED)
 
 
 def togglestate():
-#global vars
-    global toggleallow
-    global operationalstate
-    global errorstate
-#logic block
-    if toggleallow is not False:
-
-        if operationalstate is False and errorstate is True:
-
-            operationalstate = True
-            errorstate = False
-            x = errorstate
-            z = operationalstate
-            return z and x
-        
-        elif operationalstate is not False and errorstate is not True:
-
-            errorstate = True
-            operationalstate = False
-            x = operationalstate
-            z = errorstate
-            return z and x
-        
-        elif operationalstate is False and errorstate is False:
-
-            operationalstate = True
-            return operationalstate
-
-#in case of toggleallow false
+    """Compatibility wrapper for the former operational/error toggle."""
+    if not toggleallow:
+        return False
+    if state is State.OPERATIONAL:
+        enter_error()
+    elif state is State.ERROR:
+        begin_recovery()
     else:
-        print(f'Toggle unsuccessful! :(')        
+        return False
+    return True
 
-#_______________________________________________________
 
 def initial_msm():
-    #global vars
-    global toggleallow
-    global operationalstate
-    global errorstate
-    #initial turn on toggle allow
-    toggleallow = True
-    togglestate()
-    #_______________________________
-
+    """Compatibility startup helper; initialize directly as operational."""
+    global state, operationalstate, errorstate, errordetected
+    if state is State.STOPPED:
+        transition(State.STARTING)
+    if state is State.STARTING:
+        transition(State.OPERATIONAL)
+    operationalstate = state is State.OPERATIONAL
+    errorstate = state is State.ERROR
+    errordetected = errorstate
+    return state
 
 
 def print_state():
-    #global vars
-    global toggleallow
-    global operationalstate
-    global errorstate
-
-    #_________________________
-
-    if errorstate is not False:
-        state = "errorstate"
-    else:
-        state = "operationalstate"
-    
-    print(state)
+    print(state.value)
 
 
 def errorcheck():
-    global errordetected
-    #error check runs error check across all actions and systems.
-    pass
-
+    """Placeholder for the future watchdog; no checks are implemented yet."""
+    return errordetected
 
 
 def hardstop():
-    global errordetected
-    if errordetected is not False:
-        #insert all stop commands
-        pass
-    else:
-        #still insert stop commands becasue this is absolute
-        pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#_____________________________________________________________________
-#TEST SCRIPTS
-#0000000000000000
-"""
-
-__name__ == "__main__":
-initial_msm()
-print_state()
-togglestate()
-print_state()
-
-"""
-#000000000000000
-
-
-
-#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    """Placeholder for stopping active work; state transition is immediate."""
+    if state is State.OPERATIONAL:
+        return enter_error(last_error)
+    return state
