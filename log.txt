@@ -176,3 +176,7 @@ Good luck next shift.
 - Manager Daemon Failsafes and error handling tested 
 - Simulated profile tests (created a compact purchase history profile and tested the model with it)
 - Tested the model by benchmarking it with multiple CSV calls.
+
+>>> Added a Kaggle datasheet that is a simulated list of transactions
+- These transactions vary from different things and are to train our model on regular data with no fruad labels.
+- Phi should have tons of data to work with now. If you want to download the file you should check the Hackathon Notes.
