@@ -5,6 +5,9 @@ DAEMON PROTOCOL FOR BACKEND
 DUTIES:
 === Manage Backend ===
 
+-DAEMON LOGIC AND STATE
+
+
 + Backend management looks like intelligent allocation of resources
 
 + Organize data
