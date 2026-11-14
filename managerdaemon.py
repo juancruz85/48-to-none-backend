@@ -32,6 +32,9 @@ DUTIES:
 *** LIBRARIES ***
 """
 
+import numpy as np
+import pandas as pd
+
 
 """
 [[[ GLOBAL VARIABLES ]]]
@@ -42,4 +45,20 @@ DUTIES:
 """
 === FUNCTIONS ===
 """
+
+
+
+def A1(data):
+    #
+    pass
+
+def A2(data):
+    #organize 
+    pass
+
+def A3(results):
+    #send data
+    pass
+
+    
 
