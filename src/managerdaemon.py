@@ -71,7 +71,7 @@ Autonomous for application.
 
 import numpy as np
 import pandas as pd
-
+from . import msm
 
 """
 [[[ GLOBAL VARIABLES ]]]
@@ -119,4 +119,24 @@ def D_result(results):
     pass
 
     
+
+#_________________________________________________________________
+
+"""
+Operational Code
+"""
+
+while msm.operationalstateoperationalstate is not False:
+    #run usual routine periodic
+    #run
+
+
+
+
+
+
+
+
+
+
 

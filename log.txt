@@ -14,7 +14,9 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 
 >>> Abstraction to many modules. Also added common.py allowing us to write common functions that will be used everywhere.
 
+>>> msm initial and togglestate should be working now. you can use these bools to dictate state as long as the module is imported.
 
+>>> Usual machine periodic. Other logic and abstraction in-depth.
 
 
 

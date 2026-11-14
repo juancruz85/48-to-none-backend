@@ -26,7 +26,6 @@ OPERATIONAL
     4. recapture AI results, organise them with the same batch and then send to dashboard.
     5. manage AI crossreference requests.
     6. Manage requests
-    7. 
 
 
 S2:
@@ -77,10 +76,15 @@ toggleallow = False
 #yada yada
 #coast vs stop in state
 
-
-
 #s1 - operational
 # if not error variable == true then assume operational. Operational handles actions
+
+#s2 - error
+# if error send diagnose
+
+
+
+
 
 
 def togglestate():
@@ -147,18 +151,38 @@ def print_state():
 
 
 
-#s2 - error
-# if error send diagnose
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 #_____________________________________________________________________
+#TEST SCRIPTS
+#0000000000000000
+"""
+
+__name__ == "__main__":
 initial_msm()
 print_state()
 togglestate()
 print_state()
 
-
+"""
+#000000000000000
 
 
 
