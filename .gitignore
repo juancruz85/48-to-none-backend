@@ -2,3 +2,6 @@
 __pycache__/
 logs/
 **/localagentlog
+data/external/simulated-transactions/
+data/staging/simulated-transactions/
+data/staging/simulated-transactions-*/

@@ -57,6 +57,7 @@ import logging
 import os
 import sys
 import time
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -183,14 +184,19 @@ def show_unreadable():
 
 
 if __name__ == "__main__":
-    # "python -m src.main" checks everything once. "python -m src.main serve [seconds]" stays up and refreshes.
-    if sys.argv[1:2] == ["serve"]:
-        try:
-            results = serve(interval=sys.argv[2] if len(sys.argv) > 2 else 30)
-        except ValueError as bad_interval:
-            sys.exit(f"usage: python -m src.main serve [seconds between refreshes]  ({bad_interval})")
-    else:
-        results = run()
+    # Defaults to purchase_data; an explicit input folder supports isolated staged datasets.
+    parser = argparse.ArgumentParser(description="Analyze purchase CSV files.")
+    parser.add_argument("command", nargs="?", choices=("run", "serve"), default="run")
+    parser.add_argument("interval", nargs="?", type=float, default=30,
+                        help="seconds between refreshes when using serve")
+    parser.add_argument("--data-dir", type=Path, default=DATA_DIR,
+                        help="folder of input CSVs (default: purchase_data)")
+    args = parser.parse_args()
+    try:
+        results = serve(data_dir=args.data_dir, interval=args.interval) if args.command == "serve" else run(args.data_dir)
+    except ValueError as bad_argument:
+        parser.error(str(bad_argument))
+    if args.command == "run":
         show(results)
         show_unreadable()
     ms.print_state()

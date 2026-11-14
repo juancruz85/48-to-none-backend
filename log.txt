@@ -175,4 +175,4 @@ Good luck next shift.
 >>> Codex tests []
 - Manager Daemon Failsafes and error handling tested 
 - Simulated profile tests (created a compact purchase history profile and tested the model with it)
-- Tested the
+- Tested the model by benchmarking it with multiple CSV calls.
