@@ -31,3 +31,6 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 4. Connect the AI and dashboard flow: send data to the model, collect results, and route them back with their original batch.
 5. Add supervision: log activity, check for errors, stop work during failures, attempt recovery, then restart or report the issue to the development team.
 6. Add request handling and refresh routines: support concurrent work across sheets while preventing simultaneous edits to the same sheet.
+
+
+>>> Refactored the manager daemon and msm using codex then added tests using codex.
