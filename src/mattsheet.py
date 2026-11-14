@@ -112,6 +112,11 @@ class Sheet:
     # places: list[str] = field(default_factory=list)
 
     # Variable to toggle once a data sheet is sorted/validated.
+
+
+
+
+    
     is_sorted: bool = False
 
     pass

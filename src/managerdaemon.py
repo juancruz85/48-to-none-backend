@@ -89,18 +89,23 @@ D = data
 """
 
 
+def D_createsheet(csv):
+    #you'll need to have the watchdog create the datasheet objects from the csvs.
+    pass
+
 
 def D_organize(data):
     #Organize
-
+    #use the actions in datasheet.
 
 
 
     pass
 
-def D_send(data):
+def D_send(data = "blank" ): #default arg is a ruler
     #send to model then return
-
+    #(data is a csv file.)
+    #(use paramiko library to send file to a server.)
 
 
 
@@ -144,4 +149,3 @@ Error Code
 while ms.errorstate is not False:
     #stopall func.
     ms.hardstop()
-    

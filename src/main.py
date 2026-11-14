@@ -55,6 +55,7 @@ this fuction will be recalled when failsafe 1 kicks in.
 
 import numpy as np
 import pandas as pd
+import paramiko as pm
 from . import msm as ms
 from . import mattsheet as ds
 from . import managerdaemon as MD

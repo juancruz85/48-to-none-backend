@@ -20,4 +20,7 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 
 >>> Updated some logic and imported the correct modules into main.
 
+>>> started hallucinating lol.
+
+>>> note to all, stop commands and other alike subroutines need to be written to ACTUALLY be used. For now the functions calling them simply hold a pass then a print statement to confirm the efficacy.
 
