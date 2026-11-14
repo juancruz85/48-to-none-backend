@@ -25,24 +25,24 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 >>> note to all, stop commands and other alike subroutines need to be written to ACTUALLY be used. For now the functions calling them simply hold a pass then a print statement to confirm the efficacy.
 
 >>> Action plan
-1. Define the basic lifecycle: startup, normal operation, error handling, and shutdown. Make the state machine reliably enter and leave each state. - done by Juan Commit #35
-2. Build the startup path: initialize the manager, load the input data, and start backend services. - done by Juan Commit #35
-3. Implement data handling: create one sheet per input, attach metadata, and preserve each sheet’s identity through analysis and response. - done by Juan Commit #37
-4. Connect the AI and dashboard flow: send data to the model, collect results, and route them back with their original batch. - done by Juan Commit #37
-5. Add supervision: log activity, check for errors, stop work during failures, attempt recovery, then restart or report the issue to the development team. - done by Juan Commit #39
-6. Add request handling and refresh routines: support concurrent work across sheets while preventing simultaneous edits to the same sheet. - done by Juan Commit #42
+1. Define the basic lifecycle: startup, normal operation, error handling, and shutdown. Make the state machine reliably enter and leave each state. - done by Juan Commit #35 (40e9b1f)
+2. Build the startup path: initialize the manager, load the input data, and start backend services. - done by Juan Commit #35 (40e9b1f)
+3. Implement data handling: create one sheet per input, attach metadata, and preserve each sheet’s identity through analysis and response. - done by Juan Commit #37 (1c0d80c)
+4. Connect the AI and dashboard flow: send data to the model, collect results, and route them back with their original batch. - done by Juan Commit #37 (1c0d80c)
+5. Add supervision: log activity, check for errors, stop work during failures, attempt recovery, then restart or report the issue to the development team. - done by Juan Commit #39 (a8104cd)
+6. Add request handling and refresh routines: support concurrent work across sheets while preventing simultaneous edits to the same sheet. - done by Juan Commit #42 (c6bd150)
 
 
 >>> Refactored the manager daemon and msm using codex then added tests using codex.
 
-Juan Commit - #35:
+Juan Commit - #35 (40e9b1f):
 I went through and did Steps 2-3 as well as added two new tests specifically for the new features. Next will be step 4. 
 Ivan has also started work on frontend as well at this current time.
 
-Juan Commit - #36:
+Juan Commit - #36 (64b4019):
 Literally just updated log lol
 
-Juan Commit - #37:
+Juan Commit - #37 (1c0d80c):
 Added the Phi-4-mini as the model we will run for this project. Completed checklist up to step 4. 
 Now you need to use the prerequisites listed below before running this again. 
 
@@ -84,10 +84,10 @@ How to run the full system as it stands right now (fraud detection is the model'
 6. Not done yet: no frontend or API is connected, nothing is hosted on AWS, and steps 5-6 of the action plan (supervision, concurrent requests) are not started.
    The model's FRAUD/OK calls have not been checked against known fraud, treat them as "possible fraud".
 
-Juan - Commit #38:
+Juan - Commit #38 (1f4f56b):
 Quick clean up of formatting
 
-Juan - Commit #39:
+Juan - Commit #39 (a8104cd):
 Step 5 is done. We now log what it does, stops work when something breaks, tries to fix itself, and reports to us team if it cannot.
 Also made it so if only one sheet breaks that only the things related to that sheet break. Everything else remains working. However
 no failsafes run if its only one sheet thats broken. 
@@ -121,13 +121,13 @@ Not done in step 5:
 - recovery cannot fix bad data or a code bug
 - nothing watches in the background, errors are caught when an operation fails. errorcheck in msm is still the placeholder for a watchdog
 
-Juan - Commit #40:
+Juan - Commit #40 (8d40889):
 Updated ReadMe with helpful info and official team name
 
-Juan - Commit #41:
+Juan - Commit #41 (no commit of its own, went in with c6bd150):
 Added my readme update to this log. 
 
-Juan - Commit #42:
+Juan - Commit #42 (c6bd150):
 Addressed step #6 that Matt had listed earlier. I also added so that the ai will log each reply whenever we run it. Look in logs/ai_replies.txt for it.
 
 Detailed Version of everything added for Step 6:
@@ -148,7 +148,7 @@ Also no api currently exists still.
 
 Next steps right now is AWS research and connection things we need to figure out.
 
-Juan - Commit #43:
+Juan - Commit #43 (18f1ab2):
 Had Claude help me stress test the back end and we found a bunch of problems together. Tried to seal the simple
 issues first. For the other issues I figured out a work around. Only thing is right now model is limited to 50 of the most irregular purchases.
 Im personally not a fan of that solution so if we can find another that would be great. 
