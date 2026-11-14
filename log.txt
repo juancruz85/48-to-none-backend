@@ -85,3 +85,4 @@ How to run the full system as it stands right now (fraud detection is the model'
    The model's FRAUD/OK calls have not been checked against known fraud, treat them as "possible fraud".
 
 Juan Commit #38:
+Quick clean up of formatting

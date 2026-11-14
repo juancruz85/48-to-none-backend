@@ -33,10 +33,9 @@ _pipe = None
 
 
 def load():
-    #loads the model once and keeps it. calling it again does nothing.
+    #calling it again does nothing.
     global _pipe
     if _pipe is None:
-        # imported here so the rest of the backend works without them
         import torch
         from transformers import pipeline
 
@@ -47,7 +46,6 @@ def load():
 
 
 def respond(sheet):
-    #gets a Sheet: sheet.results["irregular"] is the shortlist of irregular purchases.
     #the model is asked about one purchase at a time (it skips purchases when given the whole list at once).
     #returns the purchases the model flagged as fraud, each with the model's reason.
     fraud = []
