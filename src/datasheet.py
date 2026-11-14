@@ -10,8 +10,23 @@ import pandas as pd
 def load(paths):
     df = pd.concat([pd.read_csv(p) for p in paths], ignore_index=True)
     df["Date"] = pd.to_datetime(df["Date"])
-    df = df.rename(columns={"Amount (USD)": "Amount"})
-    df = df.sort_values("Date", kind="stable").reset_index(drop=True)
+    if "Amount (USD)" in df.columns:
+        df = df.rename(columns={"Amount (USD)": "Amount"})
+    if "Item" in df.columns:
+    df["Category"] = df["Item"].map(categorize)
+    import numpy as np
+    conditions = [
+        df["Amount"] == 0,
+        df["Category"].isin(SUBSCRIPTIONS),
+        df["Category"].isin(PASSES)
+    ]
+    choices = [
+        "Free / $0",
+        "Subscription",
+        "Seasonal pass"
+    ]
+    df["Transaction_Type"] = np.select(conditions, choices, default="One-time in-app purchase")
+    return df
     df["Category"] = df["Item"].map(categorize)
     df["Transaction_Type"] = df.apply(transaction_type, axis=1)
     return df
@@ -53,7 +68,6 @@ def transaction_type(row):
     return "One-time in-app purchase"
 
 def recurring_patterns(paid, min_count=3):
-    """Items bought >= min_count times, with typical gap between charges."""
     rows = []
     for cat, g in paid.groupby("Category"):
         if len(g) < min_count:
@@ -64,8 +78,8 @@ def recurring_patterns(paid, min_count=3):
             "Charges": len(g),
             "First": g["Date"].min().date(),
             "Last": g["Date"].max().date(),
-            "Median gap (days)": gaps.median(),
-            "Typical day of month": g["Date"].dt.day.mode().iloc[0],
+            "Median gap (days)": gaps.median() if not gaps.empty else None,
+            "Typical day of month": g["Date"].dt.day.mode().iloc[0] if not g["Date"].dt.day.mode().empty else None,
             "Prices": ", ".join(f"{p:.2f}" for p in sorted(g["Amount"].unique())),
         })
     return pd.DataFrame(rows).sort_values("Charges", ascending=False)
@@ -100,12 +114,20 @@ def type_summary(df):
               .sort_values("Total", ascending=False))
 
 def payment_frequency(paid):
+    if paid.empty:
+        return {
+            "paid_charges": 0,
+            "months_spanned": 0,
+            "charges_per_month": 0,
+            "months_with_a_charge": 0,
+            "median_days_between_any_charges": None,
+        }
     months = paid["Date"].dt.to_period("M")
     span = (months.max() - months.min()).n + 1
     return {
         "paid_charges": len(paid),
         "months_spanned": span,
-        "charges_per_month": round(len(paid) / span, 2),
+        "charges_per_month": round(len(paid) / span, 2) if span > 0 else 0,
         "months_with_a_charge": months.nunique(),
         "median_days_between_any_charges": paid["Date"].diff().dt.days.median(),
     }
@@ -116,8 +138,7 @@ MUST ROUTE ALL PRINT STATEMENTS AS RETURN VALUES THEN GIVE THAT TO THE AI MODEL.
 
 THEN FINAL WILL ROUTE TO DASHBOARD.
 """
-
-
+    print(f"Rows: {len(df)} | paid: {len(paid)} | $0: {(df.Amount == 0).sum()} | total spent: ${paid.Amount.sum():,.2f}\n")
 
 def main(paths):
     df = load(paths)

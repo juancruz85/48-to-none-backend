@@ -56,10 +56,11 @@ toggleallow = False
 
 
 def toggle():
+#global vars
     global toggleallow
     global operationalstate
-
-    if toggleallow:
+#logic block
+    if toggleallow is not False:
 
         if operationalstate is False and errorstate is True:
 
@@ -76,7 +77,9 @@ def toggle():
             x = operationalstate
             z = errorstate
             return z and x
-        
+#in case of toggleallow false
+    else:
+        print(f'Toggle unsuccessful! :(')        
 
 
 #s2 - error
@@ -84,7 +87,8 @@ def toggle():
 
 
 
-
+#_____________________________________________________________________
+toggle()
 
 
 

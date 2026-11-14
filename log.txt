@@ -6,7 +6,7 @@ This is Matt. He denotes with a ">>>" so look out for that to see what he change
 
 
 >>> Added log, Daemon state machine.
->>>
+>>> Added simple logic to daemon state machine
 
 
 

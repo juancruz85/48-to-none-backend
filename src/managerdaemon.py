@@ -50,11 +50,15 @@ import pandas as pd
 
 """
 === FUNCTIONS ===
+
+suffix D_function
+D = data
+
 """
 
 
 
-def Data(data):
+def D_organize(data):
     #Organize
 
 
@@ -62,7 +66,7 @@ def Data(data):
 
     pass
 
-def A2(data):
+def D_send(data):
     #send to model then return
 
 
@@ -71,7 +75,7 @@ def A2(data):
 
     pass
 
-def A3(results):
+def D_result(results):
     #send data
 
 
