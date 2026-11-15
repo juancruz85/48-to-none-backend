@@ -26,6 +26,7 @@ so this part stays local for now.
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import math
@@ -35,7 +36,7 @@ import re
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote
@@ -57,12 +58,17 @@ gave_up = None
 # the csv folder being served, and the alarm that wakes the manager thread as soon as a csv is uploaded or deleted.
 data_dir = None
 _wake = threading.Event()
+_feedback_lock = threading.RLock()
 
 _ID = re.compile(r"[0-9a-fA-F-]{8,64}")
 _OWNED = re.compile(r"^(?P<profile>[0-9a-fA-F-]{8,64})__(?P<account>[0-9a-fA-F-]{8,64})__(?P<name>.+)$")
 
 
 class BadRequest(Exception):
+    pass
+
+
+class FeedbackConflict(Exception):
     pass
 
 
@@ -112,17 +118,175 @@ def _check_csv(content):
         raise BadRequest(f"the csv is missing the column(s): {', '.join(missing)}. it has: {', '.join(sorted(map(str, columns)))}")
 
 
-def save_sheet(profile_id, account_id, name, content):
+def _feedback_path():
+    if data_dir is None:
+        raise RuntimeError("feedback storage is not initialized")
+    return data_dir / "feedback.jsonl"
+
+
+def _read_feedback_locked():
+    path = _feedback_path()
+    records = {}
+    if not path.is_file():
+        return records
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            key = _feedback_key(record)
+            records[key] = record
+    return records
+
+
+def _feedback_key(record):
+    return json.dumps(
+        [record["profile_id"], record["account_id"], record["sheet_id"],
+         record["upload_version"], record["row"]],
+        separators=(",", ":"),
+    )
+
+
+def _write_feedback_locked(records):
+    path = _feedback_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + ".part")
+    try:
+        with partial.open("w", encoding="utf-8", newline="\n") as handle:
+            for key in sorted(records):
+                handle.write(json.dumps(records[key], ensure_ascii=False, separators=(",", ":")))
+                handle.write("\n")
+        partial.replace(path)
+    finally:
+        partial.unlink(missing_ok=True)
+
+
+def upload_version(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _sheet_path(profile_id, account_id, sheet_id, require_exists=True):
+    if not all(isinstance(value, str) for value in (profile_id, account_id, sheet_id)):
+        raise BadRequest("profile, account, and sheet ids must be strings")
+    _check_id(profile_id, "profile")
+    _check_id(account_id, "account")
+    found_profile, found_account, name = owner(sheet_id)
+    if found_profile != profile_id or found_account != account_id:
+        raise BadRequest("the sheet does not belong to that profile and account")
+    name = _file_name(name)
+    if sheet_id != f"{profile_id}__{account_id}__{name}":
+        raise BadRequest("the sheet name is not valid")
+    path = data_dir / sheet_id
+    if require_exists and not path.is_file():
+        raise FileNotFoundError("the uploaded sheet does not exist")
+    return path
+
+
+def get_feedback(profile_id, account_id=None, sheet_id=None):
+    _check_id(profile_id, "profile")
+    if account_id is not None:
+        _check_id(account_id, "account")
+    if sheet_id is not None:
+        if account_id is None:
+            raise BadRequest("an account id is required when filtering by sheet")
+        _sheet_path(profile_id, account_id, sheet_id, require_exists=False)
+    with _feedback_lock:
+        records = _read_feedback_locked().values()
+        return sorted(
+            (record for record in records
+             if record["profile_id"] == profile_id
+             and (account_id is None or record["account_id"] == account_id)
+             and (sheet_id is None or record["sheet_id"] == sheet_id)),
+            key=lambda record: (record["sheet_id"], record["upload_version"], record["row"]),
+        )
+
+
+def save_feedback(profile_id, account_id, sheet_id, version, row, label):
+    if not all(isinstance(value, str) for value in (profile_id, account_id, sheet_id)):
+        raise BadRequest("profile, account, and sheet ids must be strings")
+    if label not in {"fraud", "not_fraud"}:
+        raise BadRequest("label must be fraud or not_fraud")
+    if type(row) is not int or row < 0:
+        raise BadRequest("row must be a non-negative integer")
+    if not isinstance(version, str) or not re.fullmatch(r"[0-9a-f]{64}", version):
+        raise BadRequest("upload_version must be a SHA-256 hex digest")
+
+    path = _sheet_path(profile_id, account_id, sheet_id)
+    current_version = upload_version(path)
+    if current_version != version:
+        raise FeedbackConflict("the CSV changed; refresh the report before labeling it")
+    try:
+        row_count = len(pd.read_csv(path))
+    except Exception as error:
+        raise BadRequest(f"the current CSV could not be read: {error}") from error
+    if row >= row_count:
+        raise BadRequest("row is outside the current CSV")
+
+    record = {
+        "profile_id": profile_id,
+        "account_id": account_id,
+        "sheet_id": sheet_id,
+        "upload_version": version,
+        "row": row,
+        "label": label,
+        "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    with _feedback_lock:
+        records = _read_feedback_locked()
+        records[_feedback_key(record)] = record
+        _write_feedback_locked(records)
+    return record
+
+
+def _discard_feedback_old_versions(profile_id, account_id, sheet_id, keep_version):
+    with _feedback_lock:
+        records = _read_feedback_locked()
+        kept = {
+            key: record for key, record in records.items()
+            if not (record["profile_id"] == profile_id
+                    and record["account_id"] == account_id
+                    and record["sheet_id"] == sheet_id
+                    and record["upload_version"] != keep_version)
+        }
+        deleted = len(records) - len(kept)
+        if deleted:
+            _write_feedback_locked(kept)
+        return deleted
+
+
+def _old_feedback_count(profile_id, account_id, sheet_id, version):
+    return sum(
+        1 for record in get_feedback(profile_id, account_id, sheet_id)
+        if record["upload_version"] != version
+    )
+
+
+def save_sheet(profile_id, account_id, name, content, feedback_policy=None):
     _check_id(profile_id, "profile")
     _check_id(account_id, "account")
     name = _file_name(name)
     _check_csv(content)
     data_dir.mkdir(parents=True, exist_ok=True)
     path = data_dir / f"{profile_id}__{account_id}__{name}"
+    new_version = hashlib.sha256(content).hexdigest()
+    old_feedback_count = _old_feedback_count(profile_id, account_id, path.name, new_version)
+    if feedback_policy not in (None, "keep", "discard"):
+        raise BadRequest("feedback_policy must be keep or discard")
+    if old_feedback_count and feedback_policy is None:
+        raise BadRequest("choose whether to keep or discard feedback from previous CSV versions")
     #written under another name first so the manager never reads a half written csv.
     partial = path.with_name(path.name + ".part")
     partial.write_bytes(content)
     partial.replace(path)
+    discarded_feedback = 0
+    if feedback_policy == "discard":
+        discarded_feedback = _discard_feedback_old_versions(
+            profile_id, account_id, path.name, new_version
+        )
     _wake.set()
     return path.name
 
@@ -242,10 +406,12 @@ def _sheet(sheet_id, sheet):
         status = "done"
     baseline = (entry or {}).get("baseline") or {}
     _, account_id, name = owner(sheet_id)
+    path = data_dir / sheet_id if data_dir is not None else None
     return {
         "sheet_id": sheet_id,
         "account_id": account_id,
         "name": name,
+        "upload_version": upload_version(path) if path is not None and path.is_file() else None,
         "status": status,
         "stuck": sheet_id in MD.abandoned,
         "error": (entry or {}).get("error"),
@@ -279,6 +445,7 @@ def _waiting_sheet(sheet_id, error=None):
         "sheet_id": sheet_id,
         "account_id": account_id,
         "name": name,
+        "upload_version": upload_version(data_dir / sheet_id) if data_dir is not None and (data_dir / sheet_id).is_file() else None,
         "status": "failed" if error else "checking",
         "stuck": False,
         "error": error,
@@ -345,6 +512,35 @@ class Handler(BaseHTTPRequestHandler):
             if method == "GET" and parts == ["report"]:
                 profile_id = (parse_qs(query).get("profile") or [None])[0]
                 return self._send(200, report(profile_id))
+            if parts == ["feedback"] and method == "GET":
+                params = parse_qs(query)
+                profile_id = (params.get("profile") or [None])[0]
+                account_id = (params.get("account") or [None])[0]
+                sheet_id = (params.get("sheet") or [None])[0]
+                if profile_id is None:
+                    raise BadRequest("profile id is required")
+                return self._send(200, {
+                    "feedback": get_feedback(profile_id, account_id, sheet_id)
+                })
+            if parts == ["feedback"] and method == "POST":
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > 16 * 1024:
+                    raise BadRequest("feedback request is too large")
+                try:
+                    payload = json.loads(self.rfile.read(length))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    raise BadRequest("feedback body must be valid JSON")
+                if not isinstance(payload, dict):
+                    raise BadRequest("feedback body must be a JSON object")
+                record = save_feedback(
+                    payload.get("profile_id"),
+                    payload.get("account_id"),
+                    payload.get("sheet_id"),
+                    payload.get("upload_version"),
+                    payload.get("row"),
+                    payload.get("label"),
+                )
+                return self._send(200, {"feedback": record})
             if parts[:1] == ["sheets"] and len(parts) in (3, 4):
                 profile_id, account_id = parts[1], parts[2]
                 name = parts[3] if len(parts) == 4 else None
@@ -352,14 +548,36 @@ class Handler(BaseHTTPRequestHandler):
                     length = int(self.headers.get("Content-Length") or 0)
                     if length > MAX_UPLOAD_BYTES:
                         raise BadRequest(f"the file is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB")
-                    sheet_id = save_sheet(profile_id, account_id, name, self.rfile.read(length))
-                    return self._send(201, {"sheet_id": sheet_id, "name": owner(sheet_id)[2]})
+                    content = self.rfile.read(length)
+                    safe_name = _file_name(name)
+                    sheet_id = f"{profile_id}__{account_id}__{safe_name}"
+                    new_version = hashlib.sha256(content).hexdigest()
+                    old_path = data_dir / sheet_id
+                    previous_version = upload_version(old_path) if old_path.is_file() else None
+                    old_feedback_count = _old_feedback_count(
+                        profile_id, account_id, sheet_id, new_version
+                    )
+                    feedback_policy = (parse_qs(query).get("feedback_policy") or [None])[0]
+                    sheet_id = save_sheet(
+                        profile_id, account_id, name, content, feedback_policy
+                    )
+                    return self._send(201, {
+                        "sheet_id": sheet_id,
+                        "name": owner(sheet_id)[2],
+                        "upload_version": new_version,
+                        "replaced": previous_version is not None and previous_version != new_version,
+                        "discarded_feedback": old_feedback_count if feedback_policy == "discard" else 0,
+                    })
                 if method == "DELETE":
                     return self._send(200, {"deleted": delete_sheets(profile_id, account_id, name)})
             return self._error(404, "NOT_FOUND", "Route not found.")
         except BadRequest as bad:
             message = str(bad)
             return self._error(400, "INVALID_REQUEST", message[:1].upper() + message[1:] + ".")
+        except FeedbackConflict as conflict:
+            return self._error(409, "UPLOAD_VERSION_CHANGED", str(conflict))
+        except FileNotFoundError as missing:
+            return self._error(404, "NOT_FOUND", str(missing))
         except BrokenPipeError:
             pass
         except Exception as error:
@@ -371,6 +589,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PUT(self):
         self._route("PUT")
+
+    def do_POST(self):
+        self._route("POST")
 
     def do_DELETE(self):
         self._route("DELETE")

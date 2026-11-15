@@ -367,11 +367,32 @@ Just another log update lol. Also action plan for those after my shift below.
 - set handler
 
 
->>> Mattcommit: Testing and Smaller-Model New Feature()
+>>> Mattcommit: Testing and Smaller-Model New Feature(5ea2d1ed053141525d0e720136b0910ad8b0e709)
 
 Tested frontend capabilities to see what we missed
+
+
+>>> Feedback Mode ()
 
 ADDING FEATURE.
 
 FEATURE: User will be able to input if something is fraud or not, this reply will just be sent back to our system.
+
+- Notes:
+The feedback is stored in the browser cache + local API
+Added a manual feedback mode.
+Changes will reflect on commit below.
+
+Updated write up
+
+Feedback mode updated
+___
+Brainstormed Course of action:
+
+1. Setup frontend hosting using vercel
+2. Finish packaging features, Debug
+3. Rigorous Testing
+4. Analysis of our performance
+5. Cross analysis of how our model compares to other modules
+6. Complete write-up, make demo video, pop champagne/j
 
