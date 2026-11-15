@@ -351,3 +351,5 @@ Just another log update lol. Also action plan for those after my shift below.
 - Goal should be fully packaged by noon-1pm and focusing on the write up and demo video
 - Oh also make sure we have the sources for all our data and reference points when comparing ours to another model. 
 - Also list where ai was used for the write up (anytime i used it I listed it here in the log)
+
++ Ivan Apparently my auto save was off so i couldnt commit anything.
