@@ -1,11 +1,24 @@
-"""Manager state machine for the backend lifecycle."""
+"""
 
+Manager state machine for the backend lifecycle.
+
+MSM for short
+MS stands for Manager State and is used to prefix the module imports
+so to import say:
+
+from . import msm.py as ms
+
+"""
+#___________________________________________________________________________
+
+#LIBSLIBSLIBS
 import logging
 import threading
 from enum import Enum
 
 log = logging.getLogger("manager")
 
+#Class state_________________________________________________
 
 class State(str, Enum):
     STOPPED = "stopped"

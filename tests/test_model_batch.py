@@ -14,6 +14,13 @@ def purchase(row):
         "amount": 12.5 + row,
         "times_bought": 1,
         "times_seen": 1,
+        "baseline": {
+            "ready": True,
+            "history_count": 3,
+            "median_amount": 12.5,
+            "mad_amount": 0.0,
+            "upper_threshold": 18.75,
+        },
         "signals": ["first purchase at this price"],
     }
 
@@ -34,8 +41,9 @@ class TestBatchedModel(unittest.TestCase):
 
         def fake_pipeline(messages, **kwargs):
             prompt = messages[1]["content"]
-            self.assertIn('"paid_transactions":80', prompt)
+            self.assertNotIn('"paid_transactions":80', prompt)
             rows = json.loads(prompt.split("Transactions to review:\n", 1)[1])
+            self.assertEqual(rows[0]["prior_baseline"]["history_count"], 3)
             calls.append([row["row"] for row in rows])
             answer = [
                 {

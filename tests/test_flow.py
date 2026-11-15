@@ -107,17 +107,41 @@ class TestFlow(unittest.TestCase):
 
         found = {p["item"]: p for p in sheet.results["irregular"]}
 
-        self.assertEqual(sorted(found), ["170 Gems", "Mystery Box"])
+        self.assertEqual(sorted(found), ["170 Gems"])
         self.assertEqual(
-            found["Mystery Box"]["signals"],
-            ["only time this item was bought at this price", "amount is at least 3 times the usual $12.99"],
+            found["170 Gems"]["signals"],
+            ["duplicate charge: 1 earlier matching charge(s) for this item and amount today"],
         )
-        self.assertEqual(found["170 Gems"]["signals"], ["charged 2 times for the same thing on the same day"])
         for purchase in sheet.results["irregular"]:
             self.assertEqual(sheet.data.loc[purchase["row"], "Item"], purchase["item"])
 
+    def test_amount_outlier_uses_only_prior_item_history_and_new_items_cold_start(self):
+        (self.data_dir / "store.csv").write_text(
+            "Date,Item,Amount (USD)\n"
+            "2026-10-01,Coffee Shop,10.00\n"
+            "2026-10-02,Coffee Shop,12.00\n"
+            "2026-10-03,Coffee Shop,11.00\n"
+            "2026-10-04,Coffee Shop,30.00\n"
+            "2026-10-05,New Merchant,5000.00\n"
+        )
+        sheet = MD.D_analyze(MD.D_organize(MD.D_load(self.data_dir)["store.csv"]))
+
+        self.assertEqual([purchase["item"] for purchase in sheet.results["irregular"]], ["Coffee Shop"])
+        purchase = sheet.results["irregular"][0]
+        self.assertEqual(purchase["baseline"]["history_count"], 3)
+        self.assertEqual(purchase["baseline"]["median_amount"], 11.0)
+        self.assertEqual(purchase["baseline"]["upper_threshold"], 16.5)
+
     def test_respond_returns_only_what_the_model_calls_fraud(self):
-        (self.data_dir / "store.csv").write_text(STORE + "2026-10-20,Mystery Box,99.99\n2026-10-25,Song,1.29\n")
+        (self.data_dir / "store.csv").write_text(
+            "Date,Item,Amount (USD)\n"
+            "2026-10-01,Mystery Box,10.00\n"
+            "2026-10-02,Mystery Box,10.00\n"
+            "2026-10-03,Mystery Box,10.00\n"
+            "2026-10-20,Mystery Box,99.99\n"
+            "2026-10-25,Song,1.29\n"
+            "2026-10-25,Song,1.29\n"
+        )
         sheet = MD.D_analyze(MD.D_organize(MD.D_load(self.data_dir)["store.csv"]))
 
         def pipe(messages, **kwargs):
@@ -133,7 +157,15 @@ class TestFlow(unittest.TestCase):
         self.assertEqual(sheet.data.loc[fraud[0]["row"], "Item"], "Mystery Box")
 
     def test_every_ai_reply_is_stored(self):
-        (self.data_dir / "store.csv").write_text(STORE + "2026-10-20,Mystery Box,99.99\n2026-10-25,Song,1.29\n")
+        (self.data_dir / "store.csv").write_text(
+            "Date,Item,Amount (USD)\n"
+            "2026-10-01,Mystery Box,10.00\n"
+            "2026-10-02,Mystery Box,10.00\n"
+            "2026-10-03,Mystery Box,10.00\n"
+            "2026-10-20,Mystery Box,99.99\n"
+            "2026-10-25,Song,1.29\n"
+            "2026-10-25,Song,1.29\n"
+        )
         sheet = MD.D_analyze(MD.D_organize(MD.D_load(self.data_dir)["store.csv"]))
         replies = iter(["FRAUD - far above the usual amount", "hmm, hard to say"])
         MD.start_logging()
@@ -143,7 +175,7 @@ class TestFlow(unittest.TestCase):
 
         stored = (MD.LOG_DIR / "ai_replies.txt").read_text()
         self.assertEqual(stored.count("| store.csv | row "), 2)
-        self.assertIn("ASKED: 2026-10-20, Mystery Box, $99.99.", stored)
+        self.assertIn("ASKED: Transaction: 2026-10-20, Mystery Box, $99.99.", stored)
         self.assertIn("AI REPLIED: FRAUD - far above the usual amount\nCOUNTED AS: FRAUD\n", stored)
         self.assertIn("AI REPLIED: hmm, hard to say\nCOUNTED AS: UNCLEAR (not counted as fraud)\n", stored)
 

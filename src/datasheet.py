@@ -4,6 +4,7 @@
 #reconize payment Transaction_Type
 #payment frequency
 
+from collections import Counter, defaultdict
 import sys
 import pandas as pd
 
@@ -136,38 +137,72 @@ def payment_frequency(paid):
     }
 
 
-def irregular(df):
-    #df must come from prepare().
-    paid = df[df["Amount"] > 0]
-    if paid.empty:
-        return []
-    usual = paid["Amount"].median()
-    times_bought = paid.groupby(["Item", "Amount"])["Amount"].transform("count")
-    times_seen = paid.groupby("Item")["Amount"].transform("count")
-    charges_that_day = paid.groupby("Date")["Amount"].transform("count")
-    same_charge_that_day = paid.groupby(["Date", "Item", "Amount"])["Amount"].transform("count")
+def irregular(df, min_item_history=3):
+    """Find purchase outliers using only transactions earlier in the same sheet.
 
+    A new description is cold-started: it is not treated as suspicious merely
+    because its amount or price has never appeared before.
+    """
+    if min_item_history < 1:
+        raise ValueError("min_item_history must be positive")
+
+    paid = df[(df["Amount"] > 0) & df["Date"].notna()].sort_values("Date", kind="stable")
+    history_by_item = defaultdict(list)
+    history_by_price = Counter()
+    history_by_day = Counter()
     rows = []
+
     for row, purchase in paid.iterrows():
+        item = str(purchase["Item"])
+        item_key = " ".join(item.casefold().split())
+        amount = float(purchase["Amount"])
+        day = purchase["Date"].normalize()
+        prior_amounts = history_by_item[item_key]
+        prior_count = len(prior_amounts)
+        median_amount = mad_amount = threshold_amount = None
         signals = []
-        if times_bought[row] == 1:
-            signals.append("only time this item was bought at this price")
-        if purchase["Amount"] >= 3 * usual:
-            signals.append(f"amount is at least 3 times the usual ${usual:.2f}")
-        if same_charge_that_day[row] > 1:
-            signals.append(f"charged {same_charge_that_day[row]} times for the same thing on the same day")
-        elif charges_that_day[row] >= 3:
-            signals.append(f"one of {charges_that_day[row]} charges on the same day")
+
+        if prior_count >= min_item_history:
+            prior = pd.Series(prior_amounts, dtype="float64")
+            median_amount = float(prior.median())
+            mad_amount = float((prior - median_amount).abs().median())
+            threshold_amount = median_amount + max(3 * 1.4826 * mad_amount, median_amount * 0.5)
+            if amount > threshold_amount:
+                signals.append(
+                    f"amount ${amount:.2f} exceeds the prior {prior_count}-purchase baseline "
+                    f"(median ${median_amount:.2f}, upper threshold ${threshold_amount:.2f})"
+                )
+
+        prior_same_price = history_by_price[(item_key, amount, day)]
+        prior_same_day = history_by_day[day]
+        if prior_same_price:
+            signals.append(f"duplicate charge: {prior_same_price} earlier matching charge(s) for this item and amount today")
+        elif prior_same_day >= 2:
+            signals.append(f"one of multiple same-day purchases: {prior_same_day} earlier purchases today")
+
         if signals:
             rows.append({
                 "row": int(row),
                 "date": str(purchase["Date"].date()),
-                "item": purchase["Item"],
-                "amount": float(purchase["Amount"]),
-                "times_bought": int(times_bought[row]),
-                "times_seen": int(times_seen[row]),
+                "item": item,
+                "amount": amount,
+                "times_bought": int(prior_same_price),
+                "times_seen": int(prior_count),
+                "baseline": {
+                    "ready": prior_count >= min_item_history,
+                    "history_count": int(prior_count),
+                    "minimum_history": min_item_history,
+                    "median_amount": round(median_amount, 2) if median_amount is not None else None,
+                    "mad_amount": round(mad_amount, 2) if mad_amount is not None else None,
+                    "upper_threshold": round(threshold_amount, 2) if threshold_amount is not None else None,
+                },
                 "signals": signals,
             })
+
+        # Update after scoring so this transaction can never affect its own baseline.
+        history_by_item[item_key].append(amount)
+        history_by_price[(item_key, amount, day)] += 1
+        history_by_day[day] += 1
     return rows
 
 
@@ -212,6 +247,77 @@ def profile(df, max_items=8, max_months=6):
             {"month": str(month), "amount": round(float(amount), 2)}
             for month, amount in monthly.items()
         ],
+    }
+
+
+def baseline(df, min_overall_history=10, min_item_history=3):
+    """Build a deterministic, versioned summary of one user's historical spending.
+
+    This is descriptive state for downstream rules or model context, not a fraud
+    verdict. Amounts use the normalized positive-spending convention from prepare().
+    """
+    if min_overall_history < 1 or min_item_history < 1:
+        raise ValueError("baseline history minimums must be positive")
+
+    paid = df[(df["Amount"] > 0) & df["Date"].notna()].copy()
+    paid["_baseline_item"] = paid["Item"].map(lambda value: " ".join(str(value).casefold().split()))
+
+    def amount_stats(values):
+        values = pd.to_numeric(values, errors="coerce").dropna()
+        if values.empty:
+            return {"median_amount": None, "mad_amount": None, "p95_amount": None}
+        median = float(values.median())
+        mad = float((values - median).abs().median())
+        return {
+            "median_amount": round(median, 2),
+            "mad_amount": round(mad, 2),
+            "p95_amount": round(float(values.quantile(0.95)), 2),
+        }
+
+    overall = amount_stats(paid["Amount"])
+    monthly_paid = paid.assign(_month=paid["Date"].dt.to_period("M")).groupby("_month")["Amount"].sum()
+    if monthly_paid.empty:
+        monthly = monthly_paid
+    else:
+        months = pd.period_range(monthly_paid.index.min(), monthly_paid.index.max(), freq="M")
+        monthly = monthly_paid.reindex(months, fill_value=0)
+    monthly_stats = amount_stats(monthly)
+    all_gaps = paid.sort_values("Date")["Date"].diff().dt.total_seconds().div(86400).dropna()
+
+    item_baselines = []
+    for key, group in paid.groupby("_baseline_item", sort=False):
+        group = group.sort_values("Date", kind="stable")
+        gaps = group["Date"].diff().dt.total_seconds().div(86400).dropna()
+        display_item = str(group["Item"].mode().iloc[0]) if not group["Item"].mode().empty else str(group["Item"].iloc[0])
+        item_baselines.append({
+            "item": display_item,
+            "key": key,
+            "transaction_count": int(len(group)),
+            "ready": len(group) >= min_item_history,
+            **amount_stats(group["Amount"]),
+            "median_gap_days": round(float(gaps.median()), 2) if not gaps.empty else None,
+        })
+    item_baselines.sort(key=lambda item: (-item["transaction_count"], item["key"]))
+
+    return {
+        "schema_version": 1,
+        "method": "per_user_descriptive_median_mad",
+        "amount_unit": "as_provided_by_input",
+        "transaction_count": int(len(df)),
+        "paid_transaction_count": int(len(paid)),
+        "ready": len(paid) >= min_overall_history,
+        "minimum_history": {
+            "overall_paid_transactions": min_overall_history,
+            "per_item_transactions": min_item_history,
+        },
+        "as_of": str(paid["Date"].max().date()) if not paid.empty else None,
+        "overall": {
+            **overall,
+            "median_monthly_spend": monthly_stats["median_amount"],
+            "mad_monthly_spend": monthly_stats["mad_amount"],
+            "median_gap_days": round(float(all_gaps.median()), 2) if not all_gaps.empty else None,
+        },
+        "items": item_baselines,
     }
 
 

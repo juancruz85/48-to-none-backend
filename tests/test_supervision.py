@@ -43,7 +43,7 @@ class TestSupervision(unittest.TestCase):
         self.assertIn("state stopped -> starting", log)
         self.assertIn("loaded 2 sheet(s)", log)
         self.assertIn("checking a.csv", log)
-        self.assertIn("b.csv done: 2 irregular (2 sent to the model), 0 possible fraud", log)
+        self.assertIn("b.csv done: 0 irregular (0 sent to the model), 0 possible fraud", log)
         self.assertFalse((MD.LOG_DIR / "dev_report.txt").exists())
 
     def test_failure_of_every_sheet_is_fixed_by_recovery(self):

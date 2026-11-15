@@ -172,11 +172,22 @@ Good luck next shift.
 
 - Goals: Feed data to model, extensively test and vet programs, add new features only if required.
 
->>> Codex tests []
+>>> Codex tests (7eedaa803ff626e2f552ee53672e68cf18d309a4)
 - Manager Daemon Failsafes and error handling tested 
 - Simulated profile tests (created a compact purchase history profile and tested the model with it)
 - Tested the model by benchmarking it with multiple CSV calls.
 
->>> Added a Kaggle datasheet that is a simulated list of transactions
+>>> Added a Kaggle datasheet that is a simulated list of transactions (b846d284458adcf83d58e2c109e510c0c063e8dc)
 - These transactions vary from different things and are to train our model on regular data with no fruad labels.
 - Phi should have tons of data to work with now. If you want to download the file you should check the Hackathon Notes.
+
+- Potential Features: We could have the Frontend ask for the end user to give some info about their transactions and have our model create a baseline per user. We'll make this baseline a saved token on their local drive so we don't have to serve the data over and over again.
+- This would help us set a better predictive dataset for each user respectively.
+
+>>> Added fraud dataset, Changed baseline behavior
+- Changed baseline behavior to analyze only prior transactions
+- Removed unuseful alerts
+- Removed "new item/new price" alert
+- Fixed duplicate detection so matching purchases on different dates aren't treated as same-day dupes.
+- Fraud dataset has not been fed, contains many hidden transactions - consider using synth data aswell?
+- 81 Tests ran, 81 passed.

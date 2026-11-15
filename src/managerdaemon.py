@@ -205,6 +205,7 @@ def D_analyze(sheet):
     prepared = da.prepare(sheet.data)
     sheet.results["analysis"] = da.report(prepared)
     sheet.results["profile"] = da.profile(prepared)
+    sheet.results["baseline"] = da.baseline(prepared)
     found = da.irregular(prepared)
     strongest = sorted(found, key=lambda p: (-len(p["signals"]), -p["amount"]))[:MODEL_LIMIT]
     sheet.results["irregular"] = sorted(strongest, key=lambda p: p["row"])
@@ -233,6 +234,7 @@ def D_result(result):
         "places": sheet.places,
         "vet": sheet.results.get("vet", []),
         "analysis": sheet.results.get("analysis"),
+        "baseline": sheet.results.get("baseline"),
         "irregular": sheet.results.get("irregular", []),
         "irregular_total": sheet.results.get("irregular_total", 0),
         "fraud": sheet.results["fraud"],
