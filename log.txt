@@ -259,3 +259,14 @@ Must implement a baseline for real fraud and real transaction data.
 
 >>> Added another datasheet ()
 - Ran some tests after implementation
+
+---
+
+Ivan note (also Matt)
+
+Action plan matt built the framework during his shift and also built some data sheets during his test.
+
+My plan for my shift is to work on backend endpoints in preperation for our api (assumingly aws) working on these endpoints will allow aws to speak with our frontend so in the event that we complete the endpoints with our shift we should work on frontend dashboard integration for profiles.
+
++ Ivan save 1 (7f8094b485aef152f5e7fa705d8e1bb528ccb251)
+Im going to ingerate endpoints into the backend.
