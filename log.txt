@@ -362,3 +362,6 @@ Just another log update lol. Also action plan for those after my shift below.
 + Ivan - AWS Upgraded
 - Temporary AWS upgrade, added TZWA's card, reminder to delete
 - $50 lim set.
+- Configured IAM role access
+- Created .zip file for AWS Lambda
+- set handler
