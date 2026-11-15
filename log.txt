@@ -353,3 +353,4 @@ Just another log update lol. Also action plan for those after my shift below.
 - Also list where ai was used for the write up (anytime i used it I listed it here in the log)
 
 + Ivan Apparently my auto save was off so i couldnt commit anything.
++ Ivan Upgraded aws 
