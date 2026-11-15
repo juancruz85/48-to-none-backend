@@ -191,3 +191,28 @@ Good luck next shift.
 - Fixed duplicate detection so matching purchases on different dates aren't treated as same-day dupes.
 - Fraud dataset has not been fed, contains many hidden transactions - consider using synth data aswell?
 - 81 Tests ran, 81 passed.
+
+- goal now: Define user profile system.
+
+Feature: User profiles are created when a user creates their profile.
+YOU MUST CREATE A PROFILE BEFORE USE.
+
+Profiles can be deleted and created at will, remember not to conflict with the same email.
+Just tie it to the email itself.
+
+The profile helps us make predictive analysis of a specific financial trends and better predict fraud.
+
+NEW FEATURES (in progress) 4:41pm:
+- User profiles. we predict a baseline based on a user profile.
+- Each user can have many bank accounts. These bank accounts are sorted into tags
+- those tags have the baseline. The default tag is labelled "default"
+- Users can rename and configure tags, they can also move across their accounts however they like across tags.
+
+in short.
+
+Profiles added
+Each profile can manage accounts and histories and move them across folders called tags
+Tags can be renamed so they'll have to have a seperate system other than naming for our backend to keep track of them
+
+>>> Fallback_1 Commit ()
+- A save point in case implementation of features fails
