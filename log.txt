@@ -353,4 +353,12 @@ Just another log update lol. Also action plan for those after my shift below.
 - Also list where ai was used for the write up (anytime i used it I listed it here in the log)
 
 + Ivan Apparently my auto save was off so i couldnt commit anything.
-+ Ivan Upgraded aws 
+
+>>> AWS Save 0
+ - Upgrading our AWS to host a g4dn.xlarge server instance
+ - Fixed Ivan's IDE (why was autosave off?)
+ - Looking to test model after the next commit.
+
++ Ivan - AWS Upgraded
+- Temporary AWS upgrade, added TZWA's card, reminder to delete
+- $50 lim set.
