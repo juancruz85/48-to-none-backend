@@ -5,3 +5,5 @@ logs/
 data/external/simulated-transactions/
 data/staging/simulated-transactions/
 data/staging/simulated-transactions-*/
+data/staging/profile-model-experiment/
+data/staging/profile-model-experiment-*/

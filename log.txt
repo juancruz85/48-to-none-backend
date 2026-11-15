@@ -216,3 +216,42 @@ Tags can be renamed so they'll have to have a seperate system other than naming 
 
 >>> Fallback_1 Commit (dc0ab100a6238a0f7b5de8878fd2d089653fbe76)
 - A save point in case implementation of features fails
+
+>>> Implemented Features: Profiles (38caeaba37240d9c28143e930502051a03937a6e)
+- In-depth:
+Every User can create a profile now.
+You must have a profile, this is non-negotiable. - needs frontend portal
+This profile has tags. tags are just folders for your accounts and histories.
+Tags are the dictators of baseline. Every tag will have different baselines and every account under the tag will be lumped together during data analysis.
+
+>>> Ran Tests ()
+
+-- Ran profiles test:
+Ran 10 profile tests that passed, ran 91 tests for full suite.
+Coverage includes profile ownership, General as the default, explicit tag assignment, fallback when a tag is deleted, tag renaming, and preserving account baselines and sheet links when moving account
+
+-- Specific Test:
+Scientific test of our model with out a baseline for fraud set.
+
+Had codex make custom csvs
+
+here's the prompt:
+"Let's do a test:
+
+you can make custom csvs
+
+make a theoretical profile
+
+have two tags in this profile. one with 2 accounts (the first tag) and one with 1 account (the second tag)
+
+The first tag is for personal transactions, and the account csvs can be synthesized to have stuff like video game purchases, snacks, food, etc. the second account will have a car payment only account. 
+
+the second tag will be a buisness tag, and will contain an account used only for purchasing cleaning supplies. it's a cleaning buisness.
+
+we'll run this profile through with randomized histories. 2 times with no fraud for all. 2
+times with fraud for all (these are controls) and an experimental group ran 4 times with randomized fraud (one out of 3 accounts will have fraud but it is up to the model to key it out) 
+
+afterwards give me a result table."
+
+
+>>>
