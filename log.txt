@@ -396,3 +396,8 @@ Brainstormed Course of action:
 5. Cross analysis of how our model compares to other modules
 6. Complete write-up, make demo video, pop champagne/j
 
+>>> Frontend commit: Feedback mode Beta.0.1.1 (001f2db6e6f121b4185183125608c4657e47eeec)
+
+- Made Feedback backwards compatible with the backend. Formerly was purely reflecting in browser and was basically cosmetic.
+- Feedback now will override an AI flag whenever you hit refresh.
+- Needs to be debugged
