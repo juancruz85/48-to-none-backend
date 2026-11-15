@@ -365,3 +365,13 @@ Just another log update lol. Also action plan for those after my shift below.
 - Configured IAM role access
 - Created .zip file for AWS Lambda
 - set handler
+
+
+>>> Mattcommit: Testing and Smaller-Model New Feature()
+
+Tested frontend capabilities to see what we missed
+
+ADDING FEATURE.
+
+FEATURE: User will be able to input if something is fraud or not, this reply will just be sent back to our system.
+
