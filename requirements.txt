@@ -4,6 +4,7 @@ paramiko
 torch
 transformers
 accelerate
+boto3
 
 Prerequisites to run the project (the model is now part of startup):
 1. Python 3.14 (what the project is built and tested on).

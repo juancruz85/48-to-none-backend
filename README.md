@@ -23,5 +23,20 @@ C_func
 
 `src/profiles.py` defines the profile/account/tag ownership model for the future API. A profile has a generated `profile_id` and is uniquely associated with an authenticated `owner_id`; creating one also creates a stable-ID `General` default tag. Each account belongs to exactly one tag and owns its own baseline and imported sheet references. Accounts can be moved between tags without moving their history or baseline; deleting a custom tag moves its accounts to `General`.
 
-This is currently a process-local domain store, not durable storage and not connected to CSV loading or an API. The profile ID is an identifier, not an authorization token. The API layer still needs authentication, durable storage, and encryption for transaction history before this can hold end-user data.
+`src/profiles.py` contains the domain rules. `src/profile_repository.py` provides
+DynamoDB persistence for the initial profile API operations. Configure a
+DynamoDB table with string partition key `owner_id` and string sort key
+`record_key`, then set `PROFILE_TABLE_NAME` for the runtime. The table layout
+reserves separate owner-scoped records for the profile, tags, and accounts. The
+current repository writes the profile and its default `General` tag in one
+conditional transaction, preventing duplicate profiles for an owner;
+persistence methods for custom tags and accounts still need to be added.
+For an API Gateway HTTP API Lambda integration, use `src.profile_handler.handler`
+as the Lambda handler; `make_handler(repository)` remains injectable for local
+tests and other runtimes.
+
+The profile ID is an identifier, not an authorization token. The API handler
+must receive the owner ID from an authenticated request context. The current
+profile API work does not persist transaction histories; those require a
+separate storage and encryption design.
 

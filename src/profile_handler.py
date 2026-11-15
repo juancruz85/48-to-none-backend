@@ -1,11 +1,20 @@
 import json
+from typing import Protocol
 
 from dataclasses import asdict
 
-from src.profiles import ProfileStore
+from src.profiles import UserProfile
+
+_aws_handler = None
 
 
-def make_handler(store: ProfileStore):
+class ProfileRepository(Protocol):
+    def create_profile(self, owner_id: str) -> UserProfile: ...
+
+    def get_profile_for_owner(self, owner_id: str) -> UserProfile: ...
+
+
+def make_handler(store: ProfileRepository):
     def response(status_code, body):
         return {
             "statusCode": status_code,
@@ -78,3 +87,13 @@ def make_handler(store: ProfileStore):
         return error(404, "NOT_FOUND", "Route not found.")
 
     return handle
+
+
+def handler(event, context):
+    """AWS Lambda entry point; keep the DynamoDB client warm between calls."""
+    global _aws_handler
+    if _aws_handler is None:
+        from src.profile_repository import DynamoDBProfileRepository
+
+        _aws_handler = make_handler(DynamoDBProfileRepository.from_environment())
+    return _aws_handler(event, context)
