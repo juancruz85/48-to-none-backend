@@ -35,6 +35,17 @@ For an API Gateway HTTP API Lambda integration, use `src.profile_handler.handler
 as the Lambda handler; `make_handler(repository)` remains injectable for local
 tests and other runtimes.
 
+Build a Lambda deployment ZIP with only the profile modules and AWS SDK
+dependency (without the large fraud-model dependencies):
+
+```powershell
+python scripts/package_profile_lambda.py
+```
+
+The artifact is written to `dist/profile-lambda.zip`. Configure the Lambda
+runtime as Python 3.14, the handler as `src.profile_handler.handler`, and set
+`PROFILE_TABLE_NAME` to the DynamoDB table name.
+
 The profile ID is an identifier, not an authorization token. The API handler
 must receive the owner ID from an authenticated request context. The current
 profile API work does not persist transaction histories; those require a

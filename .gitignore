@@ -1,4 +1,5 @@
 .venv/
+/dist/profile-lambda.zip
 __pycache__/
 logs/
 **/localagentlog
