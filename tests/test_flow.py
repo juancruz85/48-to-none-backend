@@ -130,7 +130,8 @@ class TestFlow(unittest.TestCase):
         purchase = sheet.results["irregular"][0]
         self.assertEqual(purchase["baseline"]["history_count"], 3)
         self.assertEqual(purchase["baseline"]["median_amount"], 11.0)
-        self.assertEqual(purchase["baseline"]["upper_threshold"], 16.5)
+        # Never under double the usual amount (median 11.00).
+        self.assertEqual(purchase["baseline"]["upper_threshold"], 22.0)
 
     def test_respond_returns_only_what_the_model_calls_fraud(self):
         (self.data_dir / "store.csv").write_text(

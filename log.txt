@@ -271,7 +271,7 @@ My plan for my shift is to work on backend endpoints in preperation for our api 
 + Ivan save 1 (7f8094b485aef152f5e7fa705d8e1bb528ccb251)
 Im going to ingerate endpoints into the backend.
 
-Juan - Commit #59 (not committed yet):
+Juan - Commit #59 (be8efb9eb7a448e6e5575ca9ba6e5ccbce43d4ea):
 Made the api endpoints work and put it on AWS and created the api. Details below.
 
 What exists on AWS:
@@ -287,3 +287,54 @@ Rate limiting also is capped at 10 requests per sec for the backend.
 
 Next step is wiring the frontend and then deploying the data sheets and what not.
 Also personal note at this stage I feek ==l very tired with limited mental capability so I will be taking things a bit slower. 
+
+Juan - Commit #60:
+
+Ok so the model currently is not running on aws and to run the full program use this command: .venv/bin/python -m src.api 
+What that command does is it runs the backend locally for testing and developing. My current set up right now is 
+running the backend locally and then running the next js locally so I can test the full stack without being pushed anywhere. 
+So the dashboard and backend are wired. 
+
+For frontend features we now support uploading a csv through the front end and a bare bones simple log in and account creation
+system. (does come with 2fa for verifying emails are real)
+
+Just added that the model will also look for small charges that are out of the ordinary that sart to add up over time a lot and will flag them. 
+Did this by also giving it the total purchase sheet totals as well as the individual purchase feeding. I am very tired and Claude help me 
+write the rest of tonights log. Also for why the commit number is low tonight is I forgot to commit often and I was dozing in and out of sleep a lot. 
+Claude also helped create makeshift fake data to test specifically small purchase fraud.
+
+How to run the full thing locally (two terminals):
+  backend repo:   .venv/bin/python -m src.api     -> http://127.0.0.1:8000
+  frontend repo:  npm run dev                     -> http://localhost:3000
+  The frontend needs a .env.local, fill it in.
+
+the rate limit is now 100 requests per sec (burst 200) not 10 anymore
+
+New on AWS (redeployed LambdaAPI, same api as before, all need sign in):
+- POST /profiles/me/tags, PATCH and DELETE /profiles/me/tags/{tag_id}
+- POST /profiles/me/accounts, PATCH and DELETE /profiles/me/accounts/{account_id}
+  So tags and accounts are saved in DynamoDB now. Deleting a tag moves its accounts back to General. General cant be deleted.
+  You can only ever touch your own stuff.
+
+New in the backend:
+- src/api.py: the local server. It runs the manager and the model, takes csv uploads, and serves the results as json.
+  Each csv belongs to one account of one profile. Uploads are saved in user_data/ (gitignored) and checked as soon as they land.
+  It only listens on this machine. The model is about 8 GB so it does not fit in the lambda, thats why this part is local.
+- "Suspicious" is a new result next to fraud. patterns() in datasheet.py looks at one seller over time. If the charges in the
+  last 30 days are at least 6 and at least double what that seller did before, the ai gets the month by month summary and
+  says SUSPICIOUS or OK (review_patterns in model.py). Its not a fraud call, it means go take a look.
+- Changed what gets sent to the ai for single purchases so normal stuff stops getting flagged:
+  - busy day: used to be any purchase with 2 others that day. Now it takes several unfamiliar purchases in one day,
+    more than double the persons usual day. Routine purchases dont count.
+  - amount: has to be at least double the sellers usual now, it was 1.5 times.
+  - duplicate charge (same item, same amount, same day) is unchanged.
+- sample_uploads/ has two fake statements with the small apple.com/bill charges, one steady and one random.
+  Results with the real model: steady one, 0 normal purchases flagged (was 10) and 76 apple charges suspicious.
+  Random one, 51 of 76 apple charges suspicious and 1 normal purchase flagged (an Amazon order 2.4 times the usual).
+- 159 tests pass. Run them all with:
+  .venv/bin/python -m unittest $(ls tests/test_*.py | sed 's#/#.#; s#\.py$##')
+
+New in the frontend (48-to-none-frontend repo):
+- Login page with sign up, email code and sign in. Tokens stay in httpOnly cookies on the next js server.
+- Fake data is gone. Dashboard has an Accounts panel (tags, accounts, upload csv per account) and the real report per file:
+  stat cards, suspicious patterns, possible fraud, spending by month, all transactions, and the analysis text.

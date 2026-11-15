@@ -14,3 +14,5 @@ data/staging/fdb-sparkov-*/
 data/staging/profile-model-experiment/
 data/staging/profile-model-experiment-*/
 CLAUDE.md
+# csvs uploaded through the dashboard (people's purchase histories)
+user_data/

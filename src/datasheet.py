@@ -5,6 +5,7 @@
 #payment frequency
 
 from collections import Counter, defaultdict
+import math
 import sys
 import pandas as pd
 
@@ -137,19 +138,35 @@ def payment_frequency(paid):
     }
 
 
-def irregular(df, min_item_history=3):
+def irregular(df, min_item_history=3, min_day_history=10):
     """Find purchase outliers using only transactions earlier in the same sheet.
 
     A new description is cold-started: it is not treated as suspicious merely
     because its amount or price has never appeared before.
+
+    Three signals:
+    - amount: at least double what this item normally costs (and past its usual spread).
+    - duplicate: the same item at the same amount earlier the same day.
+    - burst: several unfamiliar purchases in one day, more than this person's days normally hold.
+      Routine purchases do not count towards a burst and are never part of one: groceries are not
+      suspicious because other things were bought that day. A purchase is routine when the item was
+      bought at least `min_item_history` times before and the amount is normal for it, or when the
+      item was charged this exact amount before (a bill or subscription).
+      How many purchases a day normally holds comes from the person's own earlier days, so a burst
+      needs `min_day_history` earlier days with purchases before it can fire.
     """
-    if min_item_history < 1:
-        raise ValueError("min_item_history must be positive")
+    if min_item_history < 1 or min_day_history < 1:
+        raise ValueError("min_item_history and min_day_history must be positive")
 
     paid = df[(df["Amount"] > 0) & df["Date"].notna()].sort_values("Date", kind="stable")
     history_by_item = defaultdict(list)
     history_by_price = Counter()
     history_by_day = Counter()
+    #how many purchases each earlier day ended with, to know what a busy day looks like for this person.
+    earlier_day_counts = []
+    current_day = None
+    busy_day = None
+    unfamiliar_today = 0
     rows = []
 
     for row, purchase in paid.iterrows():
@@ -157,16 +174,32 @@ def irregular(df, min_item_history=3):
         item_key = " ".join(item.casefold().split())
         amount = float(purchase["Amount"])
         day = purchase["Date"].normalize()
+        if day != current_day:
+            if current_day is not None:
+                earlier_day_counts.append(history_by_day[current_day])
+            current_day = day
+            unfamiliar_today = 0
+            busy_day = None
+            if len(earlier_day_counts) >= min_day_history:
+                #a busy day has more than double their usual day's purchases, and never fewer than 3.
+                #the median is used so a few busy days (or a few days of fraud) do not become the new normal.
+                usual = float(pd.Series(earlier_day_counts, dtype="float64").median())
+                busy_day = max(3, math.ceil(2 * usual) + 1)
         prior_amounts = history_by_item[item_key]
         prior_count = len(prior_amounts)
         median_amount = mad_amount = threshold_amount = None
+        #charged this exact amount before: a bill or a subscription.
+        routine = amount in prior_amounts
         signals = []
 
         if prior_count >= min_item_history:
             prior = pd.Series(prior_amounts, dtype="float64")
             median_amount = float(prior.median())
             mad_amount = float((prior - median_amount).abs().median())
-            threshold_amount = median_amount + max(3 * 1.4826 * mad_amount, median_amount * 0.5)
+            #what an item costs moves around (a restaurant bill, an online order), and a few purchases are not
+            #enough to know by how much. so the threshold is never under double the usual amount.
+            threshold_amount = median_amount + max(3 * 1.4826 * mad_amount, median_amount)
+            routine = routine or amount <= threshold_amount
             if amount > threshold_amount:
                 signals.append(
                     f"amount ${amount:.2f} exceeds the prior {prior_count}-purchase baseline "
@@ -177,8 +210,11 @@ def irregular(df, min_item_history=3):
         prior_same_day = history_by_day[day]
         if prior_same_price:
             signals.append(f"duplicate charge: {prior_same_price} earlier matching charge(s) for this item and amount today")
-        elif prior_same_day >= 2:
-            signals.append(f"one of multiple same-day purchases: {prior_same_day} earlier purchases today")
+        elif not routine and busy_day is not None and unfamiliar_today + 1 >= busy_day:
+            signals.append(
+                f"burst of unfamiliar purchases: number {unfamiliar_today + 1} today that is not one of "
+                f"this person's usual purchases ({prior_same_day} earlier purchases today in all)"
+            )
 
         if signals:
             rows.append({
@@ -203,7 +239,92 @@ def irregular(df, min_item_history=3):
         history_by_item[item_key].append(amount)
         history_by_price[(item_key, amount, day)] += 1
         history_by_day[day] += 1
+        if not routine:
+            unfamiliar_today += 1
     return rows
+
+
+def patterns(df, window_days=30, min_recent=6, growth=2.0):
+    """Find sellers whose charges keep getting more frequent, however small each charge is.
+
+    irregular() looks at one purchase at a time, so a stream of $1 charges on different days never
+    stands out there. This looks at one seller over time instead: a charge is part of a rising pattern
+    when the `window_days` up to it hold at least `min_recent` charges from that seller and at least
+    `growth` times what the seller's earlier history averaged over the same length of time.
+    Like irregular(), every charge is judged using only the charges before it.
+
+    This is not a fraud verdict. Each pattern is one question for the model (review_patterns in model.py),
+    which decides whether the person should take a look.
+    """
+    if window_days < 1 or min_recent < 2 or growth <= 1:
+        raise ValueError("patterns needs a positive window, at least 2 recent charges and growth above 1")
+
+    paid = df[(df["Amount"] > 0) & df["Date"].notna()].sort_values("Date", kind="stable")
+    keys = paid["Item"].map(lambda value: " ".join(str(value).casefold().split()))
+    window = pd.Timedelta(days=window_days)
+    found = []
+
+    for _, group in paid.groupby(keys, sort=False):
+        if len(group) <= min_recent:
+            continue
+        dates = group["Date"].tolist()
+        rows = [int(row) for row in group.index]
+        rising = []
+        peak = None
+        start = 0
+        for index, when in enumerate(dates):
+            while dates[start] <= when - window:
+                start += 1
+            recent = index - start + 1
+            earlier = start
+            earlier_days = (when - window - dates[0]).days
+            #a seller needs a full window of earlier history before "more than before" means anything.
+            if earlier < 1 or earlier_days < window_days:
+                continue
+            earlier_rate = earlier / (earlier_days / window_days)
+            if recent >= max(min_recent, growth * earlier_rate):
+                rising.append(index)
+                if peak is None or recent > peak["recent"]:
+                    peak = {"recent": recent, "earlier_rate": earlier_rate, "as_of": when}
+        if not rising:
+            continue
+
+        monthly = group.assign(_month=group["Date"].dt.to_period("M")).groupby("_month")["Amount"].agg(["count", "sum"])
+        months = pd.period_range(monthly.index.min(), monthly.index.max(), freq="M")
+        monthly = monthly.reindex(months, fill_value=0)
+        item = str(group["Item"].mode().iloc[0])
+        total = float(group["Amount"].sum())
+        flagged = [rows[index] for index in rising]
+        found.append({
+            "kind": "rising_charges",
+            "item": item,
+            "rows": flagged,
+            "charges": int(len(group)),
+            "total": round(total, 2),
+            "median_amount": round(float(group["Amount"].median()), 2),
+            "first": str(dates[0].date()),
+            "last": str(dates[-1].date()),
+            "rising_since": str(dates[rising[0]].date()),
+            "rising_charges": len(flagged),
+            "rising_total": round(float(group["Amount"].iloc[rising].sum()), 2),
+            "peak": {
+                "window_days": window_days,
+                "charges": int(peak["recent"]),
+                "earlier_charges_per_window": round(float(peak["earlier_rate"]), 1),
+                "as_of": str(peak["as_of"].date()),
+            },
+            "months": [
+                {"month": str(month), "charges": int(row["count"]), "total": round(float(row["sum"]), 2)}
+                for month, row in monthly.iterrows()
+            ],
+            "signal": (
+                f"{int(peak['recent'])} charges from {item} in the {window_days} days to {peak['as_of'].date()}, "
+                f"up from about {peak['earlier_rate']:.0f} per {window_days} days before; "
+                f"{len(group)} charges totalling ${total:,.2f} since {dates[0].date()}"
+            ),
+        })
+    #the patterns that cost the most come first.
+    return sorted(found, key=lambda pattern: (-pattern["rising_total"], pattern["item"]))
 
 
 def profile(df, max_items=8, max_months=6):

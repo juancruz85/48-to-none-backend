@@ -146,6 +146,106 @@ class DynamoDBProfileRepository:
             accounts=accounts,
         )
 
+    # Tags and accounts. Each change loads the owner's records, applies the
+    # domain rule from ``ProfileStore`` (names, ownership, the General tag), then
+    # writes only the records that changed.
+
+    def _store_for_owner(self, owner_id: str):
+        profile = self.get_profile_for_owner(owner_id)
+        store = ProfileStore()
+        store.profiles[profile.profile_id] = profile
+        store._profile_by_owner[owner_id] = profile.profile_id
+        return store, profile
+
+    @staticmethod
+    def _tag_key(tag_id: str) -> str:
+        return f"TAG#{tag_id}"
+
+    @staticmethod
+    def _account_key(account_id: str) -> str:
+        return f"ACCOUNT#{account_id}"
+
+    def _tag_item(self, owner_id: str, tag: ProfileTag) -> dict:
+        return {
+            "owner_id": owner_id,
+            "record_key": self._tag_key(tag.tag_id),
+            "record_type": "TAG",
+            "tag_id": tag.tag_id,
+            "profile_id": tag.profile_id,
+            "name": tag.name,
+            "is_default": tag.is_default,
+        }
+
+    def _account_item(self, owner_id: str, account: Account) -> dict:
+        return self._to_dynamodb({
+            "owner_id": owner_id,
+            "record_key": self._account_key(account.account_id),
+            "record_type": "ACCOUNT",
+            "account_id": account.account_id,
+            "profile_id": account.profile_id,
+            "tag_id": account.tag_id,
+            "name": account.name,
+            "created_at": account.created_at,
+            "baseline": account.baseline,
+            "sheet_ids": list(account.sheet_ids),
+        })
+
+    def create_tag(self, owner_id: str, name: str) -> ProfileTag:
+        store, profile = self._store_for_owner(owner_id)
+        tag = store.create_tag(profile.profile_id, name)
+        self._table.put_item(Item=self._tag_item(owner_id, tag))
+        return tag
+
+    def rename_tag(self, owner_id: str, tag_id: str, name: str) -> ProfileTag:
+        store, profile = self._store_for_owner(owner_id)
+        tag = store.rename_tag(profile.profile_id, tag_id, name)
+        self._table.put_item(Item=self._tag_item(owner_id, tag))
+        return tag
+
+    def delete_tag(self, owner_id: str, tag_id: str) -> None:
+        """Delete a custom tag and move its accounts to General in one transaction."""
+        store, profile = self._store_for_owner(owner_id)
+        moved = [account for account in profile.accounts.values() if account.tag_id == tag_id]
+        store.delete_tag(profile.profile_id, tag_id)
+        operations = [{
+            "Delete": {
+                "TableName": self._table_name,
+                "Key": {"owner_id": owner_id, "record_key": self._tag_key(tag_id)},
+            }
+        }]
+        operations += [
+            {"Put": {"TableName": self._table_name, "Item": self._account_item(owner_id, account)}}
+            for account in moved
+        ]
+        # A transaction holds at most 100 writes; the tag delete goes last so a
+        # retry after a partial failure still finds the tag and finishes the move.
+        for start in range(1, len(operations), 99):
+            self._client.transact_write_items(TransactItems=operations[start:start + 99])
+        self._client.transact_write_items(TransactItems=operations[:1])
+
+    def create_account(self, owner_id: str, name: str, tag_id: str | None = None) -> Account:
+        store, profile = self._store_for_owner(owner_id)
+        account = store.create_account(profile.profile_id, name, tag_id)
+        self._table.put_item(Item=self._account_item(owner_id, account))
+        return account
+
+    def update_account(self, owner_id: str, account_id: str, name: str | None = None,
+                       tag_id: str | None = None) -> Account:
+        """Rename an account and/or move it to another tag."""
+        store, profile = self._store_for_owner(owner_id)
+        account = store._account(profile, account_id)
+        if name is not None:
+            account = store.rename_account(profile.profile_id, account_id, name)
+        if tag_id is not None:
+            account = store.assign_account_tag(profile.profile_id, account_id, tag_id)
+        self._table.put_item(Item=self._account_item(owner_id, account))
+        return account
+
+    def delete_account(self, owner_id: str, account_id: str) -> None:
+        store, profile = self._store_for_owner(owner_id)
+        store.delete_account(profile.profile_id, account_id)
+        self._table.delete_item(Key={"owner_id": owner_id, "record_key": self._account_key(account_id)})
+
     @classmethod
     def _to_dynamodb(cls, value):
         if isinstance(value, float):

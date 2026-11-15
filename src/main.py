@@ -176,6 +176,8 @@ def show(results):
             print(f"  ({entry['irregular_total']} purchases looked irregular, only the {len(entry['irregular'])} strongest were sent to the AI)")
         for purchase in entry["fraud"]:
             print(f"  row {purchase['row']} | {purchase['date']} | {purchase['item'][:60]} | ${purchase['amount']:.2f} | {purchase['reason']}")
+        for pattern in entry.get("suspicious", []):
+            print(f"  suspicious pattern | {pattern['item'][:60]} | {pattern['signal']} | {pattern['reason']}")
 
 
 def show_unreadable():

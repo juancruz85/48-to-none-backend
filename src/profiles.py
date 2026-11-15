@@ -138,6 +138,21 @@ class ProfileStore:
         account.tag_id = new_tag_id
         return account
 
+    def rename_account(self, profile_id: str, account_id: str, name: str) -> Account:
+        profile = self.get_profile(profile_id)
+        account = self._account(profile, account_id)
+        account.name = _name(name, "account")
+        return account
+
+    def delete_account(self, profile_id: str, account_id: str) -> Account:
+        """Remove an account and release its sheets so they can be attached elsewhere."""
+        profile = self.get_profile(profile_id)
+        account = self._account(profile, account_id)
+        for sheet_id in account.sheet_ids:
+            self._sheet_account.pop((profile_id, sheet_id), None)
+        del profile.accounts[account_id]
+        return account
+
     def delete_tag(self, profile_id: str, tag_id: str) -> None:
         profile = self.get_profile(profile_id)
         tag = self._tag(profile, tag_id)

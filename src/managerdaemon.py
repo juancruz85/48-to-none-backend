@@ -210,6 +210,8 @@ def D_analyze(sheet):
     strongest = sorted(found, key=lambda p: (-len(p["signals"]), -p["amount"]))[:MODEL_LIMIT]
     sheet.results["irregular"] = sorted(strongest, key=lambda p: p["row"])
     sheet.results["irregular_total"] = len(found)
+    #sellers whose charges keep getting more frequent. looked at as a whole, not purchase by purchase.
+    sheet.results["patterns"] = da.patterns(prepared)
     return sheet
 
 
@@ -220,6 +222,19 @@ def D_send(sheet, model=None):
     if not isinstance(response, list) or not all(isinstance(flag, dict) for flag in response):
         raise TypeError(f"the model must return a list of flagged purchases, got {type(response).__name__}")
     return {"sheet_id": sheet.sheet_id, "response": response}
+
+
+def D_review(sheet, model=None):
+    #the model decides which rising-charge patterns the person should look at. suspicious, never fraud.
+    #a stand-in model (tests) only reviews patterns if it brings its own review_patterns, so swapping the
+    #model out never reaches the real one.
+    reviewer = mo.review_patterns if model is None else getattr(model, "review_patterns", None)
+    if reviewer is None or not sheet.results.get("patterns"):
+        return []
+    response = reviewer(sheet)
+    if not isinstance(response, list) or not all(isinstance(pattern, dict) for pattern in response):
+        raise TypeError(f"the model must return a list of suspicious patterns, got {type(response).__name__}")
+    return response
 
 
 def D_result(result):
@@ -238,6 +253,8 @@ def D_result(result):
         "irregular": sheet.results.get("irregular", []),
         "irregular_total": sheet.results.get("irregular_total", 0),
         "fraud": sheet.results["fraud"],
+        "patterns": sheet.results.get("patterns", []),
+        "suspicious": sheet.results.get("suspicious", []),
         "error": sheet.results.get("error"),
     }
     return dashboard[sheet.sheet_id]
@@ -248,7 +265,9 @@ def D_process(sheet, model=None):
     if sheet.results["vet"]:
         return D_result({"sheet_id": sheet.sheet_id, "response": None})
     D_analyze(sheet)
-    return D_result(D_send(sheet, model))
+    sent = D_send(sheet, model)
+    sheet.results["suspicious"] = D_review(sheet, model)
+    return D_result(sent)
 
 
 def D_check(sheet, model=None):
@@ -267,8 +286,9 @@ def D_check(sheet, model=None):
     if entry["vet"]:
         log.warning("%s not checked, failed vetting: %s", sheet.sheet_id, entry["vet"])
     else:
-        log.info("%s done: %d irregular (%d sent to the model), %d possible fraud",
-                 sheet.sheet_id, entry["irregular_total"], len(entry["irregular"]), len(entry["fraud"]))
+        log.info("%s done: %d irregular (%d sent to the model), %d possible fraud, %d of %d pattern(s) suspicious",
+                 sheet.sheet_id, entry["irregular_total"], len(entry["irregular"]), len(entry["fraud"]),
+                 len(entry["suspicious"]), len(entry["patterns"]))
     return entry, None
 
 
