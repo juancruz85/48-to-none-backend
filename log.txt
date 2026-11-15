@@ -389,12 +389,13 @@ Feedback mode updated
 ___
 Brainstormed Course of action:
 
-1. Setup frontend hosting using vercel
-2. Finish packaging features, Debug
-3. Rigorous Testing
-4. Analysis of our performance
-5. Cross analysis of how our model compares to other modules
-6. Complete write-up, make demo video, pop champagne/j
+1. Setup frontend hosting using vercel - wait for Juan
+2. Finish packaging features, Debug - Matt ** done
+3. Rigorous Testing - Ivan
+4. Analysis of our performance - Matt ** need to do
+5. Cross analysis of how our model compares to other modules - Matt
+6. Complete write-up - Matt ** need to do, 
+make demo video, pop champagne?
 
 >>> Frontend commit: Feedback mode Beta.0.1.1 (001f2db6e6f121b4185183125608c4657e47eeec)
 
@@ -402,4 +403,6 @@ Brainstormed Course of action:
 - Feedback now will override an AI flag whenever you hit refresh.
 - Needs to be debugged
 
->>> Bug fix: Feedback mode.
+>>> Bug fix: Feedback mode. (debc845c0fb286f749f082ad4f8d44b206702dd7)
+
+>>> DEBUG COMMIT ()
