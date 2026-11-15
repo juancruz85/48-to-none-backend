@@ -401,3 +401,5 @@ Brainstormed Course of action:
 - Made Feedback backwards compatible with the backend. Formerly was purely reflecting in browser and was basically cosmetic.
 - Feedback now will override an AI flag whenever you hit refresh.
 - Needs to be debugged
+
+>>> Bug fix: Feedback mode.
