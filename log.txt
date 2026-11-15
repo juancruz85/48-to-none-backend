@@ -288,7 +288,7 @@ Rate limiting also is capped at 10 requests per sec for the backend.
 Next step is wiring the frontend and then deploying the data sheets and what not.
 Also personal note at this stage I feek ==l very tired with limited mental capability so I will be taking things a bit slower. 
 
-Juan - Commit #60:
+Juan - Commit #60 (1553a6a727704d113bf50f1be49165302e750eea):
 
 Ok so the model currently is not running on aws and to run the full program use this command: .venv/bin/python -m src.api 
 What that command does is it runs the backend locally for testing and developing. My current set up right now is 
@@ -338,3 +338,16 @@ New in the frontend (48-to-none-frontend repo):
 - Login page with sign up, email code and sign in. Tokens stay in httpOnly cookies on the next js server.
 - Fake data is gone. Dashboard has an Accounts panel (tags, accounts, upload csv per account) and the real report per file:
   stat cards, suspicious patterns, possible fraud, spending by month, all transactions, and the analysis text.
+
+Juan Commit #61:
+Just another log update lol. Also action plan for those after my shift below.
+
+- Figure out where to host the model (for hopefully free)
+- Start the write up for Veritas
+- Hosting Frontend possibly
+- Try and find bugs in the backend and frontend I haven't caught
+- Get statistics for the write up of like how good our model is compared to others and such
+- Do a good sweep of the codebase and clean up sketchy solutions we have
+- Goal should be fully packaged by noon-1pm and focusing on the write up and demo video
+- Oh also make sure we have the sources for all our data and reference points when comparing ours to another model. 
+- Also list where ai was used for the write up (anytime i used it I listed it here in the log)
