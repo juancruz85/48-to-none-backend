@@ -224,7 +224,7 @@ You must have a profile, this is non-negotiable. - needs frontend portal
 This profile has tags. tags are just folders for your accounts and histories.
 Tags are the dictators of baseline. Every tag will have different baselines and every account under the tag will be lumped together during data analysis.
 
->>> Ran Tests ()
+>>> Ran Tests (c53872e097498a84e8b7f68ee7a2a81311b3c5a0)
 
 -- Ran profiles test:
 Ran 10 profile tests that passed, ran 91 tests for full suite.
@@ -253,5 +253,9 @@ times with fraud for all (these are controls) and an experimental group ran 4 ti
 
 afterwards give me a result table."
 
+Aforementioned test ran as intended. Model flagged all synthetic fradulent behavior.
 
->>>
+Must implement a baseline for real fraud and real transaction data.
+
+>>> Added another datasheet ()
+- Ran some tests after implementation

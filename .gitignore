@@ -3,7 +3,12 @@ __pycache__/
 logs/
 **/localagentlog
 data/external/simulated-transactions/
+data/external/fdb-creditcardfraud/
+data/external/fdb-sparkov/
 data/staging/simulated-transactions/
 data/staging/simulated-transactions-*/
+data/staging/fdb-creditcardfraud/
+data/staging/fdb-sparkov/
+data/staging/fdb-sparkov-*/
 data/staging/profile-model-experiment/
 data/staging/profile-model-experiment-*/
