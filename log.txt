@@ -270,3 +270,20 @@ My plan for my shift is to work on backend endpoints in preperation for our api 
 
 + Ivan save 1 (7f8094b485aef152f5e7fa705d8e1bb528ccb251)
 Im going to ingerate endpoints into the backend.
+
+Juan - Commit #59 (not committed yet):
+Made the api endpoints work and put it on AWS and created the api. Details below.
+
+What exists on AWS:
+- HTTP API: https://hraukl7w0g.execute-api.us-east-2.amazonaws.com
+  POST /profiles makes your profile, GET /profiles/me gets it back. Both go to the LambdaAPI lambda.
+- Cognito user pool 48-to-none-users (us-east-2_OZViIIef0) with app client 48-to-none-app (3d8f11uocqbc1jnaj9puv8lj9t).
+  This is the sign in. You have to be signed in to use the api, no token = 401.
+
+Also I fixed some bugs with the backend after I had claude do another stress test but live on the AWS server. I went ahead
+and fixed those. 
+
+Rate limiting also is capped at 10 requests per sec for the backend.
+
+Next step is wiring the frontend and then deploying the data sheets and what not.
+Also personal note at this stage I feek ==l very tired with limited mental capability so I will be taking things a bit slower. 

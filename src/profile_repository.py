@@ -55,23 +55,20 @@ class DynamoDBProfileRepository:
             "is_default": default_tag.is_default,
         }
 
-        from boto3.dynamodb.types import TypeSerializer
-
-        serializer = TypeSerializer()
         try:
             self._client.transact_write_items(
                 TransactItems=[
                     {
                         "Put": {
                             "TableName": self._table_name,
-                            "Item": self._serialize(profile_item, serializer),
+                            "Item": self._to_dynamodb(profile_item),
                             "ConditionExpression": "attribute_not_exists(owner_id)",
                         }
                     },
                     {
                         "Put": {
                             "TableName": self._table_name,
-                            "Item": self._serialize(tag_item, serializer),
+                            "Item": self._to_dynamodb(tag_item),
                         }
                     },
                 ]
@@ -148,13 +145,6 @@ class DynamoDBProfileRepository:
             tags=tags,
             accounts=accounts,
         )
-
-    @classmethod
-    def _serialize(cls, item, serializer):
-        return {
-            key: serializer.serialize(cls._to_dynamodb(value))
-            for key, value in item.items()
-        }
 
     @classmethod
     def _to_dynamodb(cls, value):

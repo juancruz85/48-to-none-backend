@@ -87,6 +87,24 @@ class TestProfileHandler(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(body["error"]["code"], "INVALID_REQUEST")
 
+    def test_base64_encoded_create_body_is_decoded(self):
+        event = self.event("POST", "/profiles", body="e30=")  
+        event["isBase64Encoded"] = True
+
+        status, body = self.call(event)
+
+        self.assertEqual(status, 201)
+        self.assertTrue(body["profile_id"])
+
+    def test_invalid_base64_create_body_returns_bad_request(self):
+        event = self.event("POST", "/profiles", body="!")
+        event["isBase64Encoded"] = True
+
+        status, body = self.call(event)
+
+        self.assertEqual(status, 400)
+        self.assertEqual(body["error"]["code"], "INVALID_REQUEST")
+
 
 if __name__ == "__main__":
     unittest.main()

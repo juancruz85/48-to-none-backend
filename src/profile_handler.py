@@ -1,3 +1,4 @@
+import base64
 import json
 from typing import Protocol
 
@@ -54,8 +55,10 @@ def make_handler(store: ProfileRepository):
         if method == "POST" and path == "/profiles":
             try:
                 body = event.get("body") or "{}"
+                if event.get("isBase64Encoded"):
+                    body = base64.b64decode(body).decode("utf-8")
                 payload = json.loads(body)
-            except (TypeError, json.JSONDecodeError):
+            except (TypeError, ValueError):
                 return error(400, "INVALID_REQUEST", "Request body must be valid JSON.")
 
             if not isinstance(payload, dict) or payload:
