@@ -164,7 +164,7 @@ class TestModelLoadIsLimited(StressCase):
     def test_only_the_strongest_irregular_purchases_go_to_the_model(self):
         # A month of ordinary one-purchase days first, so the ten-purchase days that follow stand out as busy.
         quiet = "".join(f"2025-12-{day:02d},Quiet {day},3.00\n" for day in range(1, 31))
-        rows = quiet + "".join(f"2026-01-{day:02d},One off {day}-{n},{n + 1}.00\n" for day in range(1, 29) for n in range(10))
+        rows = quiet + "".join(f"2026-01-{day:02d},One off {day}-{n},4.00\n" for day in range(1, 29) for n in range(10))
         history = (
             "2026-01-29,Giant,10.00\n"
             "2026-01-30,Giant,10.00\n"

@@ -147,13 +147,15 @@ def irregular(df, min_item_history=3, min_day_history=10):
     Three signals:
     - amount: at least double what this item normally costs (and past its usual spread).
     - duplicate: the same item at the same amount earlier the same day.
-    - burst: several unfamiliar purchases in one day, more than this person's days normally hold.
+    - burst: several unfamiliar purchases in one day, more than this person's days normally hold, that
+      together cost more than this person's days normally cost. Both have to be true: a day of many small
+      new purchases (a day out) is not a burst, and neither is a person who buys from new sellers all the time.
       Routine purchases do not count towards a burst and are never part of one: groceries are not
       suspicious because other things were bought that day. A purchase is routine when the item was
       bought at least `min_item_history` times before and the amount is normal for it, or when the
       item was charged this exact amount before (a bill or subscription).
-      How many purchases a day normally holds comes from the person's own earlier days, so a burst
-      needs `min_day_history` earlier days with purchases before it can fire.
+      How many purchases a day normally holds and what a day normally costs come from the person's own
+      earlier days, so a burst needs `min_day_history` earlier days with purchases before it can fire.
     """
     if min_item_history < 1 or min_day_history < 1:
         raise ValueError("min_item_history and min_day_history must be positive")
@@ -164,9 +166,14 @@ def irregular(df, min_item_history=3, min_day_history=10):
     history_by_day = Counter()
     #how many purchases each earlier day ended with, to know what a busy day looks like for this person.
     earlier_day_counts = []
+    #what each earlier day cost in all, to know what an expensive day looks like for this person.
+    earlier_day_totals = []
     current_day = None
     busy_day = None
+    busy_spend = None
     unfamiliar_today = 0
+    spend_today = 0.0
+    unfamiliar_spend_today = 0.0
     rows = []
 
     for row, purchase in paid.iterrows():
@@ -177,14 +184,24 @@ def irregular(df, min_item_history=3, min_day_history=10):
         if day != current_day:
             if current_day is not None:
                 earlier_day_counts.append(history_by_day[current_day])
+                earlier_day_totals.append(spend_today)
             current_day = day
             unfamiliar_today = 0
+            spend_today = 0.0
+            unfamiliar_spend_today = 0.0
             busy_day = None
+            busy_spend = None
             if len(earlier_day_counts) >= min_day_history:
                 #a busy day has more than double their usual day's purchases, and never fewer than 3.
                 #the median is used so a few busy days (or a few days of fraud) do not become the new normal.
                 usual = float(pd.Series(earlier_day_counts, dtype="float64").median())
                 busy_day = max(3, math.ceil(2 * usual) + 1)
+                #an expensive day costs more than double their usual day, and past the usual spread
+                #(the same rule as for one item's amount).
+                totals = pd.Series(earlier_day_totals, dtype="float64")
+                usual_total = float(totals.median())
+                total_spread = float((totals - usual_total).abs().median())
+                busy_spend = usual_total + max(3 * 1.4826 * total_spread, usual_total)
         prior_amounts = history_by_item[item_key]
         prior_count = len(prior_amounts)
         median_amount = mad_amount = threshold_amount = None
@@ -203,17 +220,22 @@ def irregular(df, min_item_history=3, min_day_history=10):
             if amount > threshold_amount:
                 signals.append(
                     f"amount ${amount:.2f} exceeds the prior {prior_count}-purchase baseline "
-                    f"(median ${median_amount:.2f}, upper threshold ${threshold_amount:.2f})"
+                    f"(median ${median_amount:.2f}, upper threshold ${threshold_amount:.2f}), "
+                    f"{amount / median_amount:.1f} times the usual amount"
                 )
 
         prior_same_price = history_by_price[(item_key, amount, day)]
         prior_same_day = history_by_day[day]
         if prior_same_price:
             signals.append(f"duplicate charge: {prior_same_price} earlier matching charge(s) for this item and amount today")
-        elif not routine and busy_day is not None and unfamiliar_today + 1 >= busy_day:
+        elif (not routine and busy_day is not None and unfamiliar_today + 1 >= busy_day
+              and unfamiliar_spend_today + amount > busy_spend):
             signals.append(
                 f"burst of unfamiliar purchases: number {unfamiliar_today + 1} today that is not one of "
-                f"this person's usual purchases ({prior_same_day} earlier purchases today in all)"
+                f"this person's usual purchases ({prior_same_day} earlier purchases today in all), "
+                f"${unfamiliar_spend_today + amount:.2f} of unfamiliar spending today against "
+                f"${usual_total:.2f} on a usual day, "
+                f"{(unfamiliar_spend_today + amount) / max(usual_total, 0.01):.1f} times a usual day"
             )
 
         if signals:
@@ -239,8 +261,10 @@ def irregular(df, min_item_history=3, min_day_history=10):
         history_by_item[item_key].append(amount)
         history_by_price[(item_key, amount, day)] += 1
         history_by_day[day] += 1
+        spend_today += amount
         if not routine:
             unfamiliar_today += 1
+            unfamiliar_spend_today += amount
     return rows
 
 

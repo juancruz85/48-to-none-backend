@@ -85,12 +85,28 @@ class TestIrregularSignals(unittest.TestCase):
         self.assertNotIn(("2026-06-01", "Grocer"), found)
 
     def test_unfamiliar_purchases_on_an_unusually_busy_day_are_a_burst(self):
-        rows = self.quiet_month() + [(f"2026-06-01", f"Unknown {n}", 20.0 + n) for n in range(5)]
+        rows = self.quiet_month() + [(f"2026-06-01", f"Unknown {n}", 60.0 + n) for n in range(5)]
 
         found = self.signals(rows)
 
         self.assertEqual(sorted(item for _, item in found), ["Unknown 2", "Unknown 3", "Unknown 4"])
         self.assertIn("burst of unfamiliar purchases", found[("2026-06-01", "Unknown 2")][0])
+
+    def test_many_small_unfamiliar_purchases_that_cost_a_normal_day_are_not_a_burst(self):
+        # a day out: five new sellers, $110 in all against a usual $60 day. busy, but not expensive.
+        rows = self.quiet_month() + [(f"2026-06-01", f"Unknown {n}", 20.0 + n) for n in range(5)]
+
+        self.assertEqual(da.irregular(frame(rows)), [])
+
+    def test_a_burst_starts_once_the_unfamiliar_spending_passes_double_a_usual_day(self):
+        # usual day $60, so the day is expensive past $120: 50, 100, 150 -> the third purchase onwards.
+        rows = self.quiet_month() + [(f"2026-06-01", f"Unknown {n}", 50.0) for n in range(4)]
+
+        found = self.signals(rows)
+
+        self.assertEqual(sorted(item for _, item in found), ["Unknown 2", "Unknown 3"])
+        self.assertIn("$150.00 of unfamiliar spending today against $60.00 on a usual day",
+                      found[("2026-06-01", "Unknown 2")][0])
 
     def test_a_person_who_always_buys_a_lot_in_a_day_is_not_bursting(self):
         rows = [(f"2026-05-{day:02d}", f"Shop {day}-{n}", 5.0 + n) for day in range(1, 29) for n in range(4)]
@@ -105,7 +121,7 @@ class TestIrregularSignals(unittest.TestCase):
     def test_a_few_busy_days_do_not_become_the_new_normal(self):
         rows = self.quiet_month()
         for day in (1, 2, 3):
-            rows += [(f"2026-06-{day:02d}", f"Unknown {day}-{n}", 20.0 + n) for n in range(5)]
+            rows += [(f"2026-06-{day:02d}", f"Unknown {day}-{n}", 60.0 + n) for n in range(5)]
 
         flagged_days = {date for date, _ in self.signals(rows)}
 
