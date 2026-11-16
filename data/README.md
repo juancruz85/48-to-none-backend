@@ -58,7 +58,15 @@ python scripts/prepare_fdb_sparkov.py
 
 The archive is capped at 400 MiB, downloaded to a temporary file, and CRC checked. Each staged account CSV contains 25 earlier, source-labeled-clean transactions followed by one held-out test target; labels are in `evaluation_labels.json`, never in the CSV. Files are under ignored `data/staging/fdb-sparkov/`, outside `purchase_data/`.
 
-In a seeded search over 30 eligible fraud-target accounts, none of the target rows entered the app's heuristic shortlist. Under the current conservative shortlist rules, those targets receive no model verdict. A separate single clean account was run through the normal app pipeline one at a time: the heuristic shortlisted six historically normal purchases, and the LLM flagged five. This is a small synthetic smoke test, not a fraud-accuracy estimate. The captured console output is in ignored `logs/fdb-sparkov-clean.out`.
+In a seeded search over 30 eligible fraud-target accounts, none of the target rows entered the app's heuristic shortlist. Scoring those 30 fraud targets plus the single clean control gives TP=0, FP=0, TN=1, FN=30: 3.2% accuracy, 0% recall, and undefined precision (no positive predictions). The one clean control is far too small to estimate specificity, and these are heuristic-gate results, not LLM accuracy. The targets receive no model verdict in production. A separate single clean account was run through the normal app pipeline one at a time: the heuristic shortlisted six historically normal purchases, and the LLM flagged five. This is a small synthetic smoke test, not a fraud-accuracy estimate. The captured console output is in ignored `logs/fdb-sparkov-clean.out`.
+
+To compare Phi-4-mini with another local instruction model on the 30 fraud targets and one clean control, run:
+
+```powershell
+python scripts/benchmark_accuracy.py
+```
+
+The script uses Phi-4-mini and Qwen2.5-3B-Instruct, downloads missing model weights from Hugging Face, and requires at least 8.5 GiB of free RAM before inference. It reports direct model-only scores separately from the end-to-end app scores, where the heuristic shortlist gates model calls. The held-out labels are loaded only for scoring. Results and per-prompt AI logs go to ignored `logs/accuracy-comparison.json` and `logs/accuracy-comparison/`. This small, fraud-heavy synthetic sample is useful for a controlled comparison, but cannot establish production accuracy; with only one clean target, precision and specificity have high uncertainty.
 
 
 ____________________________________
