@@ -3,6 +3,7 @@
     frontend repo:  npm run dev                     -> http://localhost:3000
     The frontend needs a .env.local, fill it in.
 
+Frontend Repo: https://github.com/juancruz85/48-to-none-frontend.git
 
 Terminal 1: backend (repo root, the folder with src/)
 
@@ -81,7 +82,8 @@ Phi was run in 4-bit NF4 with double quantization for the direct comparison. The
 
 ## What we'd do next
 
-Given we had more time, connecting to a bank account would have been much more optimal rather than using a CSV. User usability would be much better with this. We would’ve also hosted a backend as well. This would’ve improved end user access. Another feature that might have been implemented would be bank linking. If we had more resources, we would make the AI model bigger and better. Lastly, having a minigame during failures would have been a nice addition to add.
+   Given we had more time, connecting to a bank account would have been much more optimal rather than using a CSV. User usability would be much better with this. We would’ve also hosted a backend as well. This would’ve improved end user access. Another feature that might have been implemented would be bank linking. Lastly, having a minigame during failures would have been a nice addition to add. If we had more resources, we would make the AI model bigger and better.
+
 
 ## Sources - Ivan
 
@@ -126,3 +128,4 @@ Statement from Matt:
 > In terms of AI usage, I wrote some framework code towards the beginning, allowing my agents to get a feel for how I like to code and comment. After I got them comfortable with my workflow, I switched to pure prompting. I specifically oversaw whatever my agents wrote. Most features in the backend are AI coded, but human ideas.; down to the minute architecture.
 >
 > Agent Clients I used include: Codex, Claude, Copilot, and Gemini.”
+
