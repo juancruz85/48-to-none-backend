@@ -58,4 +58,91 @@ python scripts/prepare_fdb_sparkov.py
 
 The archive is capped at 400 MiB, downloaded to a temporary file, and CRC checked. Each staged account CSV contains 25 earlier, source-labeled-clean transactions followed by one held-out test target; labels are in `evaluation_labels.json`, never in the CSV. Files are under ignored `data/staging/fdb-sparkov/`, outside `purchase_data/`.
 
-In a seeded search over 30 eligible fraud-target accounts, none of the target rows entered the app's heuristic shortlist. Under the current conservative shortlist rules, those targets receive no model verdict. A separate single clean account was run through the normal app pipeline one at a time: the heuristic shortlisted six historically normal purchases, and the LLM flagged five. This is a small synthetic smoke test, not a fraud-accuracy estimate. The captured console output is in ignored `logs/fdb-sparkov-clean.out`.
+In a seeded search over 30 eligible fraud-target accounts, none of the target rows entered the app's heuristic shortlist. Scoring those 30 fraud targets plus the single clean control gives TP=0, FP=0, TN=1, FN=30: 3.2% accuracy, 0% recall, and undefined precision (no positive predictions). The one clean control is far too small to estimate specificity, and these are heuristic-gate results, not LLM accuracy. The targets receive no model verdict in production. A separate single clean account was run through the normal app pipeline one at a time: the heuristic shortlisted six historically normal purchases, and the LLM flagged five. This is a small synthetic smoke test, not a fraud-accuracy estimate. The captured console output is in ignored `logs/fdb-sparkov-clean.out`.
+
+To compare Phi-4-mini with another local instruction model on the 30 fraud targets and one clean control, run:
+
+```powershell
+python scripts/benchmark_accuracy.py
+```
+
+The script uses Phi-4-mini and Qwen2.5-3B-Instruct, downloads missing model weights from Hugging Face, and requires at least 8.5 GiB of free RAM before inference. It reports direct model-only scores separately from the end-to-end app scores, where the heuristic shortlist gates model calls. The held-out labels are loaded only for scoring. Results and per-prompt AI logs go to ignored `logs/accuracy-comparison.json` and `logs/accuracy-comparison/`. This small, fraud-heavy synthetic sample is useful for a controlled comparison, but cannot establish production accuracy; with only one clean target, precision and specificity have high uncertainty.
+
+
+____________________________________
+AI GEN PROFILE READ
+
+## Account profiles (domain model)
+
+`src/profiles.py` defines the profile/account/tag ownership model for the future API. A profile has a generated `profile_id` and is uniquely associated with an authenticated `owner_id`; creating one also creates a stable-ID `General` default tag. Each account belongs to exactly one tag and owns its own baseline and imported sheet references. Accounts can be moved between tags without moving their history or baseline; deleting a custom tag moves its accounts to `General`.
+
+`src/profiles.py` contains the domain rules. `src/profile_repository.py` provides
+DynamoDB persistence for the initial profile API operations. Configure a
+DynamoDB table with string partition key `owner_id` and string sort key
+`record_key`, then set `PROFILE_TABLE_NAME` for the runtime. The table layout
+reserves separate owner-scoped records for the profile, tags, and accounts. The
+current repository writes the profile and its default `General` tag in one
+conditional transaction, preventing duplicate profiles for an owner;
+persistence methods for custom tags and accounts still need to be added.
+For an API Gateway HTTP API Lambda integration, use `src.profile_handler.handler`
+as the Lambda handler; `make_handler(repository)` remains injectable for local
+tests and other runtimes.
+
+Build a Lambda deployment ZIP with only the profile modules and AWS SDK
+dependency (without the large fraud-model dependencies):
+
+```powershell
+python scripts/package_profile_lambda.py
+```
+
+The artifact is written to `dist/profile-lambda.zip`. Configure the Lambda
+runtime as Python 3.14, the handler as `src.profile_handler.handler`, and set
+`PROFILE_TABLE_NAME` to the DynamoDB table name.
+
+The profile ID is an identifier, not an authorization token. The API handler
+must receive the owner ID from an authenticated request context. The current
+profile API work does not persist transaction histories; those require a
+separate storage and encryption design.
+
+## Profile API routes (AWS Lambda)
+
+All routes need a Cognito sign-in token and only ever touch the signed-in user's own records.
+
+| Route | What it does |
+|---|---|
+| `POST /profiles` | Create the profile and its `General` tag |
+| `GET /profiles/me` | The profile with its tags and accounts |
+| `POST /profiles/me/tags` `{name}` | Create a tag |
+| `PATCH /profiles/me/tags/{tag_id}` `{name}` | Rename a tag |
+| `DELETE /profiles/me/tags/{tag_id}` | Delete a tag; its accounts move to `General` |
+| `POST /profiles/me/accounts` `{name, tag_id?}` | Create an account (in `General` unless a tag is given) |
+| `PATCH /profiles/me/accounts/{account_id}` `{name?, tag_id?}` | Rename an account and/or move it to another tag |
+| `DELETE /profiles/me/accounts/{account_id}` | Delete an account |
+
+## Local dashboard API
+
+`src/api.py` runs the whole program (startup, model, fraud check, refresh) and serves the results
+as JSON for the frontend dashboard. It also stores the CSVs users upload to their accounts:
+
+```
+.venv/bin/python -m src.api          # http://127.0.0.1:8000
+```
+
+| Route | What it does |
+|---|---|
+| `GET /report?profile=<profile_id>` | The fraud report for one profile's uploaded CSVs |
+| `PUT /sheets/<profile_id>/<account_id>/<name>.csv` | Upload a CSV to an account (the body is the file) |
+| `DELETE /sheets/<profile_id>/<account_id>/<name>.csv` | Delete one CSV |
+| `DELETE /sheets/<profile_id>/<account_id>` | Delete every CSV of an account |
+
+Uploads are kept in `user_data/` (git-ignored) and are checked as soon as they arrive. The server
+only listens on this machine and trusts its caller: the frontend server checks who is signed in
+before calling it. The model is too large for the profile Lambda, so the fraud check runs locally.
+Each CSV is analysed on its own; accounts in the same tag do not share a baseline yet.
+
+Each purchase in the report has one status: `fraud` (the model flagged that purchase), `suspicious`
+(it is part of a pattern of charges from one seller that keep getting more frequent, and the model
+says to take a look), `cleared` (it looked irregular and the model passed it) or `ok`. The pattern
+check is `patterns()` in `src/datasheet.py`; the model's question for it is `review_patterns()` in
+`src/model.py`. `sample_uploads/` has two made-up statements that show it: one where the small charges rise
+steadily and one where they rise unevenly, with quiet weeks and busy days.

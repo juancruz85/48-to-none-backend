@@ -351,3 +351,58 @@ Just another log update lol. Also action plan for those after my shift below.
 - Goal should be fully packaged by noon-1pm and focusing on the write up and demo video
 - Oh also make sure we have the sources for all our data and reference points when comparing ours to another model. 
 - Also list where ai was used for the write up (anytime i used it I listed it here in the log)
+
++ Ivan Apparently my auto save was off so i couldnt commit anything.
+
+>>> AWS Save 0
+ - Upgrading our AWS to host a g4dn.xlarge server instance
+ - Fixed Ivan's IDE (why was autosave off?)
+ - Looking to test model after the next commit.
+
++ Ivan - AWS Upgraded
+- Temporary AWS upgrade, added TZWA's card, reminder to delete
+- $50 lim set.
+- Configured IAM role access
+- Created .zip file for AWS Lambda
+- set handler
+
+
+>>> Mattcommit: Testing and Smaller-Model New Feature(5ea2d1ed053141525d0e720136b0910ad8b0e709)
+
+Tested frontend capabilities to see what we missed
+
+
+>>> Feedback Mode ()
+
+ADDING FEATURE.
+
+FEATURE: User will be able to input if something is fraud or not, this reply will just be sent back to our system.
+
+- Notes:
+The feedback is stored in the browser cache + local API
+Added a manual feedback mode.
+Changes will reflect on commit below.
+
+Updated write up
+
+Feedback mode updated
+___
+Brainstormed Course of action:
+
+1. Setup frontend hosting using vercel - wait for Juan
+2. Finish packaging features, Debug - Matt ** done
+3. Rigorous Testing - Ivan
+4. Analysis of our performance - Matt ** need to do
+5. Cross analysis of how our model compares to other modules - Matt
+6. Complete write-up - Matt ** need to do, 
+make demo video, pop champagne?
+
+>>> Frontend commit: Feedback mode Beta.0.1.1 (001f2db6e6f121b4185183125608c4657e47eeec)
+
+- Made Feedback backwards compatible with the backend. Formerly was purely reflecting in browser and was basically cosmetic.
+- Feedback now will override an AI flag whenever you hit refresh.
+- Needs to be debugged
+
+>>> Bug fix: Feedback mode. (debc845c0fb286f749f082ad4f8d44b206702dd7)
+
+>>> DEBUG COMMIT ()
