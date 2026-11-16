@@ -148,6 +148,46 @@ class TestApi(unittest.TestCase):
         self.assertEqual(missing.exception.code, 404)
         missing.exception.close()
 
+    def test_only_the_dashboard_page_may_call_from_a_browser(self):
+        main.initialize(self.data_dir)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), api.Handler)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+
+        def call(method, path, **headers):
+            request = urllib.request.Request(f"{base}{path}", method=method, headers=headers)
+            try:
+                with urllib.request.urlopen(request) as response:
+                    return response.status, response.headers
+            except urllib.error.HTTPError as error:
+                error.close()
+                return error.code, error.headers
+
+        status, headers = call("GET", "/report", Origin="https://lafluke.com")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Access-Control-Allow-Origin"], "https://lafluke.com")
+
+        #the question the browser asks before an upload from the hosted dashboard.
+        status, headers = call("OPTIONS", "/sheets/11111111/22222222/a.csv", Origin="https://lafluke.com",
+                               **{"Access-Control-Request-Method": "PUT", "Access-Control-Request-Private-Network": "true"})
+        self.assertEqual(status, 204)
+        self.assertEqual(headers["Access-Control-Allow-Origin"], "https://lafluke.com")
+        self.assertIn("PUT", headers["Access-Control-Allow-Methods"])
+        self.assertEqual(headers["Access-Control-Allow-Private-Network"], "true")
+
+        #any other website the user has open is refused, and so is another name pointed at this machine.
+        for method in ("GET", "OPTIONS", "DELETE"):
+            status, headers = call(method, "/report", Origin="https://evil.example")
+            self.assertEqual(status, 403)
+            self.assertIsNone(headers["Access-Control-Allow-Origin"])
+        self.assertEqual(call("GET", "/report", Origin="null")[0], 403)
+        self.assertEqual(call("GET", "/report", Host="evil.example:8000")[0], 403)
+
+        #no Origin at all is not a browser page: curl and the tests keep working.
+        self.assertEqual(call("GET", "/report")[0], 200)
+
 
 def _creeping():
     """A statement where one seller's $0.99 charges go from 2 a month to one every day."""

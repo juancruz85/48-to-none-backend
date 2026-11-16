@@ -8,6 +8,7 @@ every csv belongs to one account of one profile.
 Run it from the repo root:
     .venv/bin/python -m src.api
     .venv/bin/python -m src.api --port 8000 --interval 30 --data-dir user_data
+    .venv/bin/python -m src.api --allow-origin https://example.com    (a dashboard hosted somewhere else)
 
 Routes:
     GET    /health                                   is the server up
@@ -20,9 +21,14 @@ Routes:
 Uploads are saved in user_data/ as <profile_id>__<account_id>__<name>.csv. The manager only knows
 csv files in one folder, so who owns a sheet is kept in its file name.
 
-It only listens on this machine (127.0.0.1) and trusts whoever calls it: the frontend server checks
-who is signed in before it calls. The model is too big for the AWS Lambda the profile api runs on,
-so this part stays local for now.
+It only listens on this machine (127.0.0.1). The dashboard page calls it straight from the browser,
+also when the dashboard itself is hosted (lafluke.com): every user runs this backend on their own
+computer and their browser talks to it there. The model is too big for the AWS Lambda the profile
+api runs on, so this part stays local.
+
+A browser is only let in from the dashboard's own address (ALLOWED_ORIGINS, more with --allow-origin).
+Any other website the user has open is refused, so it cannot read or change their purchases.
+Calls that do not come from a browser page (curl, the tests) carry no Origin and are trusted as before.
 """
 
 import argparse
@@ -50,6 +56,17 @@ from . import msm as ms
 
 USER_DATA_DIR = Path(__file__).resolve().parent.parent / "user_data"
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+# the addresses the dashboard is served from. a page from anywhere else may not call this api.
+ALLOWED_ORIGINS = {
+    "https://lafluke.com",
+    "https://www.lafluke.com",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+}
+allowed_origins = set(ALLOWED_ORIGINS)
+# the names this server answers to. another name pointed at 127.0.0.1 (dns rebinding) is refused.
+allowed_hosts = {"127.0.0.1", "localhost", "[::1]"}
 
 # set when the background run could not be fixed and gave up (failsafe 2), so the dashboard can say so.
 gave_up = None
@@ -330,13 +347,49 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        self._cors()
         self.end_headers()
         self.wfile.write(data)
 
     def _error(self, status, code, message):
         self._send(status, {"error": {"code": code, "message": message}})
 
+    def _cors(self):
+        #lets the dashboard page read the answer. the browser hides it from every other page.
+        origin = self.headers.get("Origin")
+        if origin in allowed_origins:
+            self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
+
+    def _refused(self):
+        """Answer 403 and return True when the call comes from a web page that is not the dashboard."""
+        host = re.sub(r":\d+$", "", self.headers.get("Host") or "").lower()
+        if host and host not in allowed_hosts:
+            self._error(403, "HOST_NOT_ALLOWED", "This backend only answers on 127.0.0.1.")
+            return True
+        origin = self.headers.get("Origin")
+        if origin is not None and origin not in allowed_origins:
+            self._error(403, "ORIGIN_NOT_ALLOWED", "This website may not use the fraud backend.")
+            return True
+        return False
+
+    def do_OPTIONS(self):
+        #the browser asks first before it sends an upload, a delete or json from the dashboard page.
+        if self._refused():
+            return
+        self.send_response(204)
+        self._cors()
+        self.send_header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        #chrome asks for this before a public website may call an address on the user's own computer.
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def _route(self, method):
+        if self._refused():
+            return
         path, _, query = self.path.partition("?")
         parts = [unquote(part) for part in path.split("/") if part]
         try:
@@ -421,8 +474,10 @@ def _work(interval):
         time.sleep(0.2)
 
 
-def serve(folder=USER_DATA_DIR, port=8000, interval=30, host="127.0.0.1"):
+def serve(folder=USER_DATA_DIR, port=8000, interval=30, host="127.0.0.1", origins=()):
     global data_dir
+    allowed_origins.update(origin.rstrip("/") for origin in origins)
+    allowed_hosts.add(host.lower())
     data_dir = Path(folder)
     data_dir.mkdir(parents=True, exist_ok=True)
     MD.start_logging()
@@ -450,5 +505,7 @@ if __name__ == "__main__":
     parser.add_argument("--interval", type=float, default=30, help="seconds between refreshes of the csv folder")
     parser.add_argument("--data-dir", type=Path, default=USER_DATA_DIR,
                         help="folder the uploaded CSVs are kept in (default: user_data)")
+    parser.add_argument("--allow-origin", action="append", default=[], metavar="URL",
+                        help="another address the dashboard is served from, e.g. https://example.com (can be repeated)")
     args = parser.parse_args()
-    serve(folder=args.data_dir, port=args.port, interval=args.interval)
+    serve(folder=args.data_dir, port=args.port, interval=args.interval, origins=args.allow_origin)
