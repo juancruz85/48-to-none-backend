@@ -1,7 +1,42 @@
+# How to run the full thing locally (two terminals):
+    backend repo:   .venv/bin/python -m src.api     -> http://127.0.0.1:8000
+    frontend repo:  npm run dev                     -> http://localhost:3000
+    The frontend needs a .env.local, fill it in.
+
+
+Terminal 1: backend (repo root, the folder with src/)
+
+cd "path\to\48-to-none-frontend"
+.venv\Scripts\Activate.ps1
+python -m src.api
+
+Check http://127.0.0.1:8000/health.
+
+Terminal 2: frontend (repo root, the folder with package.json)
+
+cd "path\to\48-to-none-frontend"
+npm install
+npm run dev
+
+Then open http://localhost:3000.
+
+.env.local must exist next to package.json before npm run dev:
+
+PROFILE_API_URL=https://hraukl7w0g.execute-api.us-east-2.amazonaws.com
+FRAUD_API_URL=http://127.0.0.1:8000
+COGNITO_REGION=us-east-2
+COGNITO_CLIENT_ID=3d8f11uocqbc1jnaj9puv8lj9t
+
+npm install is only needed the first time, or after a git pull that changes package.json.
+
+_____________________________________________________________________________________________
+WRITE UP:
+
 # L. U. C. K. I.
 
 Track: Finance
 
+**Team Name:** "48toNone"
 **Team:** Juan Cruz Jr, Ivan Duong, and Matt J. A. Nozawa
 
 ## The problem: Transaction Security
