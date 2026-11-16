@@ -81,7 +81,7 @@ Phi was run in 4-bit NF4 with double quantization for the direct comparison. The
 
 ## What we'd do next
 
-    Given more time, connecting to a bank account would have been much more optimal rather than using a csv. User usability would be much better. We proposed hosting the backend. That might have been implemented would be bank linking. Lastly, having a minigame during failures would have been a nice addition to add.
+Given we had more time, connecting to a bank account would have been much more optimal rather than using a CSV. User usability would be much better with this. We would’ve also hosted a backend as well. This would’ve improved end user access. Another feature that might have been implemented would be bank linking. Lastly, having a minigame during failures would have been a nice addition to add. If we had more resources, we would make the AI model bigger and better.
 
 ## Sources - Ivan
 
