@@ -6,7 +6,7 @@
 
 Terminal 1: backend (repo root, the folder with src/)
 
-cd "path\to\48-to-none-frontend"
+cd "path\to\48-to-none-backend"
 .venv\Scripts\Activate.ps1
 python -m src.api
 
