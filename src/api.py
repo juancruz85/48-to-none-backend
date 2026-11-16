@@ -12,6 +12,7 @@ Run it from the repo root:
 
 Routes:
     GET    /health                                   is the server up
+    GET    /bridge                                   helper page that relays the dashboard's calls (Safari)
     GET    /report?profile=<profile_id>              everything the dashboard needs for one profile
     GET    /report                                   every sheet in the folder (no profile filter)
     PUT    /sheets/<profile_id>/<account_id>/<name>  upload a csv (the body is the file)
@@ -29,6 +30,10 @@ api runs on, so this part stays local.
 A browser is only let in from the dashboard's own address (ALLOWED_ORIGINS, more with --allow-origin).
 Any other website the user has open is refused, so it cannot read or change their purchases.
 Calls that do not come from a browser page (curl, the tests) carry no Origin and are trusted as before.
+
+Safari does not let an https page call plain http on 127.0.0.1 at all. There the dashboard opens
+/bridge in a small window instead: that page is served from here, so it may call this api, and it
+passes the dashboard's requests on (window.postMessage). It only listens to the allowed origins.
 """
 
 import argparse
@@ -76,6 +81,42 @@ gave_up = None
 data_dir = None
 _wake = threading.Event()
 _feedback_lock = threading.RLock()
+
+# the page behind GET /bridge. __ORIGINS__ becomes the list of allowed origins.
+BRIDGE_PAGE = """<!doctype html>
+<meta charset="utf-8">
+<title>48 to None - backend link</title>
+<body style="font: 15px -apple-system, sans-serif; margin: 2em">
+<p><b>Keep this window open.</b></p>
+<p id="state">It links the dashboard to the fraud backend on this computer. Closing it disconnects the dashboard.</p>
+<script>
+const allowed = __ORIGINS__;
+const state = document.getElementById("state");
+//tell the dashboard this window is here. repeated so a reloaded dashboard finds it again.
+const announce = () => {
+  if (!window.opener || window.opener.closed) { state.textContent = "The dashboard is closed. You can close this window."; return; }
+  for (const origin of allowed) window.opener.postMessage({ fraudBridge: "ready" }, origin);
+};
+announce();
+setInterval(announce, 1500);
+addEventListener("message", async (event) => {
+  const ask = event.data;
+  if (!allowed.includes(event.origin) || !ask || ask.fraudBridge !== "request") return;
+  let status = 503;
+  let text = JSON.stringify({ error: { code: "BACKEND_DOWN", message: "The fraud backend on this computer stopped answering." } });
+  try {
+    if (typeof ask.path !== "string" || !ask.path.startsWith("/") || ask.path.startsWith("//")) throw new Error("bad path");
+    const answer = await fetch(ask.path, {
+      method: ask.method, body: ask.body, cache: "no-store",
+      headers: typeof ask.body === "string" ? { "Content-Type": "application/json" } : undefined,
+    });
+    status = answer.status;
+    text = await answer.text();
+  } catch {}
+  event.source.postMessage({ fraudBridge: "response", id: ask.id, status, text }, event.origin);
+});
+</script>
+"""
 
 _ID = re.compile(r"[0-9a-fA-F-]{8,64}")
 _OWNED = re.compile(r"^(?P<profile>[0-9a-fA-F-]{8,64})__(?P<account>[0-9a-fA-F-]{8,64})__(?P<name>.+)$")
@@ -518,6 +559,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _bridge(self):
+        #the helper window Safari needs. see the top of this file.
+        data = BRIDGE_PAGE.replace("__ORIGINS__", json.dumps(sorted(allowed_origins))).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
     def _error(self, status, code, message):
         self._send(status, {"error": {"code": code, "message": message}})
 
@@ -535,7 +586,9 @@ class Handler(BaseHTTPRequestHandler):
             self._error(403, "HOST_NOT_ALLOWED", "This backend only answers on 127.0.0.1.")
             return True
         origin = self.headers.get("Origin")
-        if origin is not None and origin not in allowed_origins:
+        #the bridge page is served from here, so its own calls carry this server's address as Origin.
+        own = "http://" + (self.headers.get("Host") or "").lower()
+        if origin is not None and origin not in allowed_origins and origin != own:
             self._error(403, "ORIGIN_NOT_ALLOWED", "This website may not use the fraud backend.")
             return True
         return False
@@ -562,6 +615,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if method == "GET" and parts == ["health"]:
                 return self._send(200, {"ok": True, "state": ms.state.value})
+            if method == "GET" and parts == ["bridge"]:
+                return self._bridge()
             if method == "GET" and parts == ["report"]:
                 profile_id = (parse_qs(query).get("profile") or [None])[0]
                 return self._send(200, report(profile_id))

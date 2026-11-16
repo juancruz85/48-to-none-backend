@@ -188,6 +188,15 @@ class TestApi(unittest.TestCase):
         #no Origin at all is not a browser page: curl and the tests keep working.
         self.assertEqual(call("GET", "/report")[0], 200)
 
+        #the bridge page (Safari) is served from here and may call back with this server's own address.
+        status, headers = call("GET", "/bridge")
+        self.assertEqual(status, 200)
+        self.assertTrue(headers["Content-Type"].startswith("text/html"))
+        with urllib.request.urlopen(f"{base}/bridge") as response:
+            self.assertIn('"https://lafluke.com"', response.read().decode())
+        self.assertEqual(call("DELETE", "/sheets/11111111/22222222", Origin=base)[0], 200)
+        self.assertEqual(call("GET", "/report", Origin="http://127.0.0.1:1")[0], 403)
+
 
 def _creeping():
     """A statement where one seller's $0.99 charges go from 2 a month to one every day."""
